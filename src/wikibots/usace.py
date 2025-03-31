@@ -26,6 +26,18 @@ class UsaceBot(ExistingPageBot):
     def __init__(self, **kwargs: Any):
         super().__init__(**kwargs)
 
+        if os.getenv('PWB_CONSUMER_TOKEN') and os.getenv('PWB_CONSUMER_SECRET') and os.getenv(
+                'PWB_ACCESS_TOKEN') and os.getenv('PWB_ACCESS_SECRET'):
+            authenticate = (
+                os.getenv('PWB_CONSUMER_TOKEN'),
+                os.getenv('PWB_CONSUMER_SECRET'),
+                os.getenv('PWB_ACCESS_TOKEN'),
+                os.getenv('PWB_ACCESS_SECRET'),
+            )
+            pywikibot.config.authenticate["commons.wikimedia.org"] = authenticate
+        else:
+            pywikibot.config.password_file = "user-password.py"
+
         self.site = Site("commons", "commons", user=os.getenv("PWB_USERNAME") or "CuratorBot")
         self.site.login()
 
