@@ -1,3 +1,37 @@
+# Deploying on Toolforge
+
+## Building
+
+For main branch:
+
+```bash
+toolforge build start --image <IMAGE-NAME> https://github.com/DaxServer/wikibots.git
+```
+
+For a specific branch:
+
+```bash
+toolforge build start --image <IMAGE-NAME> https://github.com/DaxServer/wikibots.git --ref <BRANCH>
+```
+
+## Deploying
+
+Use `<COMMAND>` from Procfile
+
+For a one-off run:
+
+```bash
+toolforge jobs run --image tool-curator/<IMAGE-NAME>:latest --command <COMMAND> <NAME>
+```
+
+For continuous run:
+
+```bash
+toolforge jobs run --continuous --image tool-curator/<IMAGE-NAME>:latest --command <COMMAND> <NAME>
+```
+
+# ToDo
+
 ## Commons
 
 1. USACE SDC

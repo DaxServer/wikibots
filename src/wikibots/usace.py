@@ -76,8 +76,7 @@ class UsaceBot(ExistingPageBot):
 
         statements = []
 
-        if date is not None:
-            date_matches = re.match(r'^(\d{4}(-\d{2}(-\d{2})?)?)$', date)
+        if (date_matches := re.match(r'^(\d{4}(-\d{2}(-\d{2})?)?)$', date or '')) is not None:
             pprint(date_matches.groups())
 
             precision = 'day' if date_matches.group(3) else 'month' if date_matches.group(2) else 'year'
