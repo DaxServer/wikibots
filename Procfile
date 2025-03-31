@@ -1,1 +1,1 @@
-bot: ./usace.sh
+usace: python /workspace/src/wikibots/usace.py
