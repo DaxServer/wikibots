@@ -1,0 +1,23 @@
+[project]
+name = "wikibots"
+version = "0.1.0"
+authors = [
+    {name = "DaxServer",email = "daxserver@icloud.com"}
+]
+readme = "README.md"
+requires-python = ">=3.13"
+dependencies = [
+    "pywikibot (>=10.0.0,<11.0.0)",
+    "flickypedia @ git+https://github.com/DaxServer/flickypedia.git@trunk",
+    "python-dateutil (>=2.9.0.post0,<3.0.0)",
+]
+
+[tool.poetry]
+packages = [{include = "wikibots", from = "src"}]
+
+[tool.poetry.scripts]
+usace = "wikibots.usace:main"
+
+[build-system]
+requires = ["poetry-core>=2.0.0,<3.0.0"]
+build-backend = "poetry.core.masonry.api"
