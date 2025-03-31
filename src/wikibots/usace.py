@@ -57,17 +57,8 @@ class UsaceBot(ExistingPageBot):
         templ = textlib.extract_templates_and_params(self.current_page.text, True, True)
 
         photograph = list(filter(lambda t: t[0] == 'Photograph' or t[0] == 'Book', templ))[0]
-        date = photograph[1]['date'] if 'date' in photograph[1] else None
-        source = photograph[1]['source'] if 'source' in photograph[1] else None
-
-        if date is not None and '{{' in date:
-            pywikibot.error(f'Complicated date: {date}')
-            date = None
-
-        if re.match(r'^https://usace\.contentdm\.oclc\.org/digital/collection/p\d+coll\d+/id/\d+$',
-                    source or '') is None:
-            pywikibot.error(f'Invalid source: {source}')
-            source = None
+        date = photograph[1]['date'] if 'date' in photograph[1] else ''
+        source = photograph[1]['source'] if 'source' in photograph[1] else ''
 
         pprint(date)
         pprint(source)
@@ -91,7 +82,7 @@ class UsaceBot(ExistingPageBot):
 
             statements.append(claim.toJSON())
 
-        if source is not None:
+        if re.match(r'^https://usace\.contentdm\.oclc\.org/digital/collection/p\d+coll\d+/id/\d+$', source) is not None:
             source_statement = create_source_statement(
                 described_at_url=source,
                 operator=WDEntities.USACE,
@@ -128,7 +119,7 @@ class UsaceBot(ExistingPageBot):
             pywikibot.info("No claims to set")
             return
 
-        pywikibot.debug(f"The claims are {claims}")
+        # pprint(claims)
 
         payload = {
             "action": "wbeditentity",
