@@ -14,8 +14,8 @@ from pywikibot.page import WikibaseEntity
 from pywikibot.page._collections import ClaimCollection
 from pywikibot.pagegenerators import SearchPageGenerator
 
-from wikibots.lib.wikidata_entities import WikidataEntity
-from wikibots.lib.wikidata_properties import WikidataProperty
+from .lib.wikidata_entities import WikidataEntity
+from .lib.wikidata_properties import WikidataProperty
 
 
 class UsaceBot(ExistingPageBot):
