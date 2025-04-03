@@ -8,18 +8,14 @@ from typing import Any
 import pywikibot
 from dateutil import parser
 from deepdiff import DeepDiff
-from flickypedia.apis import WikimediaApi
-from flickypedia.backfillr.actions import create_actions
-from flickypedia.structured_data import WikidataProperties
-from flickypedia.structured_data.statements import create_source_statement
-from httpx import Client
-from pywikibot import Site, textlib, Claim
+from pywikibot import Site, textlib, Claim, ItemPage
 from pywikibot.bot import ExistingPageBot
+from pywikibot.page import WikibaseEntity
+from pywikibot.page._collections import ClaimCollection
 from pywikibot.pagegenerators import SearchPageGenerator
 
-
-class WDEntities:
-    USACE = 'Q1049334'
+from wikibots.lib.wikidata_entities import WikidataEntity
+from wikibots.lib.wikidata_properties import WikidataProperty
 
 
 class UsaceBot(ExistingPageBot):
@@ -38,14 +34,12 @@ class UsaceBot(ExistingPageBot):
         else:
             pywikibot.config.password_file = "user-password.py"
 
-        self.site = Site("commons", "commons", user=os.getenv("PWB_USERNAME") or "CuratorBot")
-        self.site.login()
+        self.wikidata = Site("wikidata", "wikidata")
+        self.commons = Site("commons", "commons", user=os.getenv("PWB_USERNAME") or "CuratorBot")
+        self.commons.login()
 
-        self.generator = SearchPageGenerator('deepcat:"Images from USACE" -haswbstatement:P571', site=self.site)
-
-        self.user_agent = f"{self.site.username()} / Wikimedia Commons"
-        self.http_client = Client(headers={"User-Agent": self.user_agent})
-        self.wikimedia_api = WikimediaApi(client=self.http_client)
+        self.generator = SearchPageGenerator(f'deepcat:"Images from USACE" -haswbstatement:{WikidataProperty.SourceOfFile}', site=self.commons)
+        self.user_agent = f"{self.commons.username()} / Wikimedia Commons"
 
     def skip_page(self, page: pywikibot.page.BasePage) -> bool:
         return 'CuratorBot' != page.oldest_revision.user
@@ -63,76 +57,58 @@ class UsaceBot(ExistingPageBot):
         pprint(date)
         pprint(source)
 
-        existing_claims = self.wikimedia_api.get_structured_data(mid=mid)
+        new_claims = []
+        existing_claims = ClaimCollection.fromJSON(
+            data=self.commons.simple_request(action="wbgetentities", ids=mid).submit()['entities'][mid]['statements'],
+            repo=self.commons
+        )
 
-        statements = []
-
-        if (date_matches := re.match(r'^(\d{4}(-\d{2}(-\d{2})?)?)$', date or '')) is not None:
+        if WikidataProperty.Inception not in existing_claims and (date_matches := re.match(r'^(\d{4}(-\d{2}(-\d{2})?)?)$', date or '')) is not None:
             pprint(date_matches.groups())
 
-            precision = 'day' if date_matches.group(3) else 'month' if date_matches.group(2) else 'year'
-
             ts = pywikibot.Timestamp.fromisoformat(parser.isoparse(date).isoformat())
+            precision = 'day' if date_matches.group(3) else 'month' if date_matches.group(2) else 'year'
             wb_ts = pywikibot.WbTime.fromTimestamp(ts, precision)
 
             pprint(wb_ts)
 
-            claim = Claim(self.site, WikidataProperties.Inception)
+            claim = Claim(self.commons, WikidataProperty.Inception)
             claim.setTarget(wb_ts)
 
-            statements.append(claim.toJSON())
+            new_claims.append(claim.toJSON())
 
-        if re.match(r'^https://usace\.contentdm\.oclc\.org/digital/collection/p\d+coll\d+/id/\d+$', source) is not None:
-            source_statement = create_source_statement(
-                described_at_url=source,
-                operator=WDEntities.USACE,
-                original_url=None,
-                retrieved_at=None,
-            )
+        if WikidataProperty.SourceOfFile not in existing_claims and re.match(r'^https://usace\.contentdm\.oclc\.org/digital/collection/p\d+coll\d+/id/\d+$', source) is not None:
+            claim = Claim(self.commons, WikidataProperty.SourceOfFile)
+            claim.setTarget(ItemPage(self.wikidata, WikidataEntity.FileAvailableOnInternet))
 
-            statements.append(source_statement)
+            qualifier_described_at_url = Claim(self.commons, WikidataProperty.DescribedAtUrl)
+            qualifier_described_at_url.setTarget(source)
+            claim.addQualifier(qualifier_described_at_url)
 
-        new_claims = {"claims": statements}
+            qualifier_operator = Claim(self.commons, WikidataProperty.Operator)
+            qualifier_operator.setTarget(ItemPage(self.wikidata, WikidataEntity.USACE))
+            claim.addQualifier(qualifier_operator)
 
-        actions = create_actions(existing_claims, new_claims, None)
+            new_claims.append(claim.toJSON())
 
-        claims = []
-
-        for a in actions:
-            if a["action"] == "unknown" or a["action"] == "do_nothing":
-                continue
-            elif a["action"] == "add_missing":
-                claims.append(a["statement"])
-            elif a["action"] == "add_qualifiers" or a["action"] == "replace_statement":
-                statement = a["statement"]
-                statement["id"] = a["statement_id"]
-                claims.append(statement)
-            elif a["action"] == "remove_statement":
-                claims.append({
-                    "id": a["statement_id"],
-                    "remove": "",
-                })
-            else:
-                raise ValueError(f"Unrecognised action: {a['action']}")
-
-        if not claims:
+        if not new_claims:
             pywikibot.info("No claims to set")
             return
 
-        # pprint(claims)
+        pprint(new_claims)
 
         payload = {
             "action": "wbeditentity",
             "id": mid,
-            "data": json.dumps({"claims": claims}),
-            "token": self.site.get_tokens("csrf")['csrf'],
+            "data": json.dumps({"claims": new_claims}),
+            "token": self.commons.get_tokens("csrf")['csrf'],
             "summary": "add [[Commons:Structured data|SDC]] based on metadata. Task #3",
             "tags": "BotSDC",
             "bot": True,
         }
-        request = self.site.simple_request(**payload)
+        request = self.commons.simple_request(**payload)
 
-        pprint(DeepDiff([], claims))
+        pprint(DeepDiff([], new_claims))
 
         try:
             start = perf_counter()
