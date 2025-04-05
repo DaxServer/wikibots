@@ -5,12 +5,12 @@ from pprint import pprint
 from time import perf_counter
 from typing import Any
 
+import mwparserfromhell
 import pywikibot
 from dateutil import parser
 from deepdiff import DeepDiff
 from pywikibot import Site, textlib, Claim, ItemPage
 from pywikibot.bot import ExistingPageBot
-from pywikibot.page import WikibaseEntity
 from pywikibot.page._collections import ClaimCollection
 from pywikibot.pagegenerators import SearchPageGenerator
 
@@ -20,12 +20,8 @@ class WikidataEntity:
     Copyrighted = "Q50423863"
     DedicatedToPublicDomainByCopyrightOwner = "Q88088423"
     FileAvailableOnInternet = "Q74228490"
-    Flickr = "Q103204"
-    GregorianCalendar = "Q1985727"
-    NationalLibraryOfFinland = "Q420747"
     PublicDomain = "Q19652"
     StatedByCopyrightHolderAtSourceWebsite = "Q61045577"
-    UnitedStatesOfAmerica = "Q30"
     USACE = 'Q1049334'
     WorkOfTheFederalGovernmentOfTheUnitedStates = "Q60671452"
 
@@ -33,24 +29,23 @@ class WikidataEntity:
 class WikidataProperty:
     AppliesToJurisdiction = "P1001"
     AuthorName = "P2093"
-    BhlPageId = "P687"
-    CoordinatesOfThePointOfView = "P1259"
     CopyrightLicense = "P275"
     CopyrightStatus = "P6216"
     Creator = "P170"
     DescribedAtUrl = "P973"
     DeterminationMethod = "P459"
-    FlickrPhotoId = "P12120"
-    FlickrUserId = "P3267"
     Inception = "P571"
     Operator = "P137"
     PublicationDate = "P577"
     PublishedIn = "P1433"
-    Retrieved = "P813"
     SourceOfFile = "P7482"
     SourcingCircumstances = "P1480"
     Title = "P1476"
     Url = "P2699"
+
+
+def parse_date(date: str) -> re.Match:
+    return re.match(r'^(\d{4}(-\d{2}(-\d{2})?)?)$', date)
 
 
 class UsaceBot(ExistingPageBot):
@@ -86,7 +81,7 @@ class UsaceBot(ExistingPageBot):
         templ = textlib.extract_templates_and_params(self.current_page.text, True, True)
 
         photograph = list(filter(lambda t: t[0] == 'Photograph' or t[0] == 'Book', templ))[0]
-        date = photograph[1]['date'] if 'date' in photograph[1] else ''
+        date = photograph[1]['date'] if 'date' in photograph[1] else None
         source = photograph[1]['source'] if 'source' in photograph[1] else ''
 
         pprint(date)
@@ -98,33 +93,11 @@ class UsaceBot(ExistingPageBot):
             repo=self.commons
         )
 
-        if WikidataProperty.Inception not in existing_claims and (date_matches := re.match(r'^(\d{4}(-\d{2}(-\d{2})?)?)$', date or '')) is not None:
-            pprint(date_matches.groups())
+        if date is not None and (inception_claim := self.process_inception_claim(existing_claims, date)) is not None:
+            new_claims.append(inception_claim.toJSON())
 
-            ts = pywikibot.Timestamp.fromisoformat(parser.isoparse(date).isoformat())
-            precision = 'day' if date_matches.group(3) else 'month' if date_matches.group(2) else 'year'
-            wb_ts = pywikibot.WbTime.fromTimestamp(ts, precision)
-
-            pprint(wb_ts)
-
-            claim = Claim(self.commons, WikidataProperty.Inception)
-            claim.setTarget(wb_ts)
-
-            new_claims.append(claim.toJSON())
-
-        if WikidataProperty.SourceOfFile not in existing_claims and re.match(r'^https://usace\.contentdm\.oclc\.org/digital/collection/p\d+coll\d+/id/\d+$', source) is not None:
-            claim = Claim(self.commons, WikidataProperty.SourceOfFile)
-            claim.setTarget(ItemPage(self.wikidata, WikidataEntity.FileAvailableOnInternet))
-
-            qualifier_described_at_url = Claim(self.commons, WikidataProperty.DescribedAtUrl)
-            qualifier_described_at_url.setTarget(source)
-            claim.addQualifier(qualifier_described_at_url)
-
-            qualifier_operator = Claim(self.commons, WikidataProperty.Operator)
-            qualifier_operator.setTarget(ItemPage(self.wikidata, WikidataEntity.USACE))
-            claim.addQualifier(qualifier_operator)
-
-            new_claims.append(claim.toJSON())
+        if (source_claim := self.process_source_claim(existing_claims, source)) is not None:
+            new_claims.append(source_claim.toJSON())
 
         if not new_claims:
             pywikibot.info("No claims to set")
@@ -149,6 +122,65 @@ class UsaceBot(ExistingPageBot):
             pywikibot.info(f"Updating {mid} took {(perf_counter() - start):.1f} s")
         except Exception as e:
             pywikibot.critical(f"Failed to update: {e}")
+
+    def process_inception_claim(self, existing_claims: ClaimCollection, date: str) -> Claim | None:
+        if WikidataProperty.Inception in existing_claims:
+            return None
+
+        if (date_matches := parse_date(date)) is not None:
+            return self.create_inception_claim(date, date_matches)
+
+        wikitext = mwparserfromhell.parse(date)
+        complex_date = [t for t in wikitext.filter_templates() if t.name.matches("complex date")]
+
+        if len(complex_date) != 1 or len(complex_date[0].params) != 2:
+            return None
+
+        param0 = complex_date[0].params[0].value.get(0).value
+        param1 = complex_date[0].params[1].value.get(0).value
+
+        if param0 == 'ca' and (date_matches := parse_date(param1)) is not None:
+            circa_qualifier = Claim(self.commons, WikidataProperty.SourcingCircumstances)
+            circa_qualifier.setTarget(ItemPage(self.wikidata, WikidataEntity.Circa))
+
+            return self.create_inception_claim(param1, date_matches, [circa_qualifier])
+
+    def create_inception_claim(self, date: str, date_matches: re.Match, qualifiers: list[Claim] = ()) -> Claim:
+        pprint(date_matches.groups())
+
+        ts = pywikibot.Timestamp.fromisoformat(parser.isoparse(date).isoformat())
+        precision = 'day' if date_matches.group(3) else 'month' if date_matches.group(2) else 'year'
+        wb_ts = pywikibot.WbTime.fromTimestamp(ts, precision)
+
+        pprint(wb_ts)
+
+        claim = Claim(self.commons, WikidataProperty.Inception)
+        claim.setTarget(wb_ts)
+
+        for qualifier in qualifiers:
+            claim.addQualifier(qualifier)
+
+        return claim
+
+    def process_source_claim(self, existing_claims: ClaimCollection, source: str) -> Claim | None:
+        if WikidataProperty.SourceOfFile in existing_claims:
+            return None
+
+        if re.match(r'^https://usace\.contentdm\.oclc\.org/digital/collection/p\d+coll\d+/id/\d+$', source) is None:
+            return None
+
+        claim = Claim(self.commons, WikidataProperty.SourceOfFile)
+        claim.setTarget(ItemPage(self.wikidata, WikidataEntity.FileAvailableOnInternet))
+
+        qualifier_described_at_url = Claim(self.commons, WikidataProperty.DescribedAtUrl)
+        qualifier_described_at_url.setTarget(source)
+        claim.addQualifier(qualifier_described_at_url)
+
+        qualifier_operator = Claim(self.commons, WikidataProperty.Operator)
+        qualifier_operator.setTarget(ItemPage(self.wikidata, WikidataEntity.USACE))
+        claim.addQualifier(qualifier_operator)
+
+        return claim
 
 
 def main():
