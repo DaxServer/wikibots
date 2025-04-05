@@ -6,13 +6,14 @@ from time import perf_counter
 from typing import Any
 
 import mwparserfromhell
-import pywikibot
 from dateutil import parser
 from deepdiff import DeepDiff
-from pywikibot import Site, textlib, Claim, ItemPage
+from pywikibot import Site, textlib, Claim, ItemPage, info, critical, Timestamp, WbTime
 from pywikibot.bot import ExistingPageBot
+from pywikibot.page import BasePage
 from pywikibot.page._collections import ClaimCollection
 from pywikibot.pagegenerators import SearchPageGenerator
+from pywikibot.scripts.generate_user_files import pywikibot as pwb
 
 
 class WikidataEntity:
@@ -60,9 +61,9 @@ class UsaceBot(ExistingPageBot):
                 os.getenv('PWB_ACCESS_TOKEN'),
                 os.getenv('PWB_ACCESS_SECRET'),
             )
-            pywikibot.config.authenticate["commons.wikimedia.org"] = authenticate
+            pwb.config.authenticate["commons.wikimedia.org"] = authenticate
         else:
-            pywikibot.config.password_file = "user-password.py"
+            pwb.config.password_file = "user-password.py"
 
         self.wikidata = Site("wikidata", "wikidata")
         self.commons = Site("commons", "commons", user=os.getenv("PWB_USERNAME") or "CuratorBot")
@@ -71,11 +72,11 @@ class UsaceBot(ExistingPageBot):
         self.generator = SearchPageGenerator(f'deepcat:"Images from USACE" -haswbstatement:{WikidataProperty.SourceOfFile}', site=self.commons)
         self.user_agent = f"{self.commons.username()} / Wikimedia Commons"
 
-    def skip_page(self, page: pywikibot.page.BasePage) -> bool:
+    def skip_page(self, page: BasePage) -> bool:
         return 'CuratorBot' != page.oldest_revision.user
 
     def treat_page(self) -> None:
-        pywikibot.info(self.current_page.full_url())
+        info(self.current_page.full_url())
 
         mid = f'M{self.current_page.pageid}'
         templ = textlib.extract_templates_and_params(self.current_page.text, True, True)
@@ -100,7 +101,7 @@ class UsaceBot(ExistingPageBot):
             new_claims.append(source_claim.toJSON())
 
         if not new_claims:
-            pywikibot.info("No claims to set")
+            info("No claims to set")
             return
 
         payload = {
@@ -119,9 +120,9 @@ class UsaceBot(ExistingPageBot):
         try:
             start = perf_counter()
             request.submit()
-            pywikibot.info(f"Updating {mid} took {(perf_counter() - start):.1f} s")
+            info(f"Updating {mid} took {(perf_counter() - start):.1f} s")
         except Exception as e:
-            pywikibot.critical(f"Failed to update: {e}")
+            critical(f"Failed to update: {e}")
 
     def process_inception_claim(self, existing_claims: ClaimCollection, date: str) -> Claim | None:
         if WikidataProperty.Inception in existing_claims:
@@ -148,9 +149,9 @@ class UsaceBot(ExistingPageBot):
     def create_inception_claim(self, date: str, date_matches: re.Match, qualifiers: list[Claim] = ()) -> Claim:
         pprint(date_matches.groups())
 
-        ts = pywikibot.Timestamp.fromisoformat(parser.isoparse(date).isoformat())
+        ts = Timestamp.fromisoformat(parser.isoparse(date).isoformat())
         precision = 'day' if date_matches.group(3) else 'month' if date_matches.group(2) else 'year'
-        wb_ts = pywikibot.WbTime.fromTimestamp(ts, precision)
+        wb_ts = WbTime.fromTimestamp(ts, precision)
 
         pprint(wb_ts)
 
