@@ -14,8 +14,43 @@ from pywikibot.page import WikibaseEntity
 from pywikibot.page._collections import ClaimCollection
 from pywikibot.pagegenerators import SearchPageGenerator
 
-from .lib.wikidata_entities import WikidataEntity
-from .lib.wikidata_properties import WikidataProperty
+
+class WikidataEntity:
+    Circa = "Q5727902"
+    Copyrighted = "Q50423863"
+    DedicatedToPublicDomainByCopyrightOwner = "Q88088423"
+    FileAvailableOnInternet = "Q74228490"
+    Flickr = "Q103204"
+    GregorianCalendar = "Q1985727"
+    NationalLibraryOfFinland = "Q420747"
+    PublicDomain = "Q19652"
+    StatedByCopyrightHolderAtSourceWebsite = "Q61045577"
+    UnitedStatesOfAmerica = "Q30"
+    USACE = 'Q1049334'
+    WorkOfTheFederalGovernmentOfTheUnitedStates = "Q60671452"
+
+
+class WikidataProperty:
+    AppliesToJurisdiction = "P1001"
+    AuthorName = "P2093"
+    BhlPageId = "P687"
+    CoordinatesOfThePointOfView = "P1259"
+    CopyrightLicense = "P275"
+    CopyrightStatus = "P6216"
+    Creator = "P170"
+    DescribedAtUrl = "P973"
+    DeterminationMethod = "P459"
+    FlickrPhotoId = "P12120"
+    FlickrUserId = "P3267"
+    Inception = "P571"
+    Operator = "P137"
+    PublicationDate = "P577"
+    PublishedIn = "P1433"
+    Retrieved = "P813"
+    SourceOfFile = "P7482"
+    SourcingCircumstances = "P1480"
+    Title = "P1476"
+    Url = "P2699"
 
 
 class UsaceBot(ExistingPageBot):
@@ -94,8 +129,6 @@ class UsaceBot(ExistingPageBot):
         if not new_claims:
             pywikibot.info("No claims to set")
             return
-
-        pprint(new_claims)
 
         payload = {
             "action": "wbeditentity",
