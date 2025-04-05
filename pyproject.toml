@@ -10,6 +10,7 @@ dependencies = [
     "pywikibot (>=10.0.0,<11.0.0)",
     "python-dateutil (>=2.9.0.post0,<3.0.0)",
     "deepdiff (>=8.4.2,<9.0.0)",
+    "requests-oauthlib (>=2.0.0,<3.0.0)",
 ]
 
 [tool.poetry]
