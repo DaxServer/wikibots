@@ -69,7 +69,7 @@ class UsaceBot(ExistingPageBot):
         self.commons = Site("commons", "commons", user=os.getenv("PWB_USERNAME") or "CuratorBot")
         self.commons.login()
 
-        self.generator = SearchPageGenerator(f'deepcat:"Images from USACE" -haswbstatement:{WikidataProperty.SourceOfFile}', site=self.commons)
+        self.generator = SearchPageGenerator(f'file: deepcat:"Images from USACE" -haswbstatement:{WikidataProperty.SourceOfFile}', site=self.commons)
         self.user_agent = f"{self.commons.username()} / Wikimedia Commons"
 
     def skip_page(self, page: BasePage) -> bool:
