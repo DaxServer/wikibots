@@ -11,6 +11,8 @@ dependencies = [
     "python-dateutil (>=2.9.0.post0,<3.0.0)",
     "deepdiff (>=8.4.2,<9.0.0)",
     "requests-oauthlib (>=2.0.0,<3.0.0)",
+    "google-api-python-client (>=2.166.0,<3.0.0)",
+    "lingua-language-detector (>=2.1.0,<3.0.0)",
 ]
 
 [tool.poetry]
@@ -18,6 +20,7 @@ packages = [{include = "wikibots", from = "src"}]
 
 [tool.poetry.scripts]
 usace = "wikibots.usace:main"
+youtube = "wikibots.youtube:main"
 
 [build-system]
 requires = ["poetry-core>=2.0.0,<3.0.0"]
