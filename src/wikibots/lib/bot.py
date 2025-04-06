@@ -1,0 +1,69 @@
+import json
+import os
+from pprint import pprint
+from time import perf_counter
+from typing import Any
+
+from deepdiff import DeepDiff
+from pywikibot import Site, info, critical
+from pywikibot.bot import ExistingPageBot
+from pywikibot.page._collections import ClaimCollection
+from pywikibot.scripts.wrapper import pwb
+
+try:
+    from wikidata import WikidataEntity, WikidataProperty
+except:
+    from wikibots.lib.wikidata import WikidataProperty
+
+
+class BaseBot(ExistingPageBot):
+    def __init__(self, **kwargs: Any):
+        super().__init__(**kwargs)
+
+        if os.getenv('PWB_CONSUMER_TOKEN') and os.getenv('PWB_CONSUMER_SECRET') and os.getenv(
+                'PWB_ACCESS_TOKEN') and os.getenv('PWB_ACCESS_SECRET'):
+            authenticate = (
+                os.getenv('PWB_CONSUMER_TOKEN'),
+                os.getenv('PWB_CONSUMER_SECRET'),
+                os.getenv('PWB_ACCESS_TOKEN'),
+                os.getenv('PWB_ACCESS_SECRET'),
+            )
+            pwb.config.authenticate["commons.wikimedia.org"] = authenticate
+        else:
+            pwb.config.password_file = "user-password.py"
+
+        self.wikidata = Site("wikidata", "wikidata")
+        self.commons = Site("commons", "commons", user=os.getenv("PWB_USERNAME"))
+        self.commons.login()
+
+        self.user_agent = f"{self.commons.username()} / Wikimedia Commons"
+
+        self.existing_claims: ClaimCollection
+        self.new_claims = []
+
+    def save(self):
+        if not self.new_claims:
+            info("No claims to set")
+            return
+
+        mid = f'M{self.current_page.pageid}'
+
+        payload = {
+            "action": "wbeditentity",
+            "id": mid,
+            "data": json.dumps({"claims": self.new_claims}),
+            "token": self.commons.get_tokens("csrf")['csrf'],
+            "summary": "add [[Commons:Structured data|SDC]] based on metadata. Task #3",
+            "tags": "BotSDC",
+            "bot": True,
+        }
+        request = self.commons.simple_request(**payload)
+
+        pprint(DeepDiff([], self.new_claims))
+
+        try:
+            start = perf_counter()
+            request.submit()
+            info(f"Updating {mid} took {(perf_counter() - start):.1f} s")
+        except Exception as e:
+            critical(f"Failed to update: {e}")
