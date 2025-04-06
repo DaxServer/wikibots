@@ -1,6 +1,7 @@
 import json
 import os
 import re
+import sys
 from pprint import pprint
 from time import perf_counter
 from typing import Any
@@ -15,62 +16,24 @@ from pywikibot.page._collections import ClaimCollection
 from pywikibot.pagegenerators import SearchPageGenerator
 from pywikibot.scripts.generate_user_files import pywikibot as pwb
 
-
-class WikidataEntity:
-    Circa = "Q5727902"
-    Copyrighted = "Q50423863"
-    DedicatedToPublicDomainByCopyrightOwner = "Q88088423"
-    FileAvailableOnInternet = "Q74228490"
-    PublicDomain = "Q19652"
-    StatedByCopyrightHolderAtSourceWebsite = "Q61045577"
-    USACE = 'Q1049334'
-    WorkOfTheFederalGovernmentOfTheUnitedStates = "Q60671452"
-
-
-class WikidataProperty:
-    AppliesToJurisdiction = "P1001"
-    AuthorName = "P2093"
-    CopyrightLicense = "P275"
-    CopyrightStatus = "P6216"
-    Creator = "P170"
-    DescribedAtUrl = "P973"
-    DeterminationMethod = "P459"
-    Inception = "P571"
-    Operator = "P137"
-    PublicationDate = "P577"
-    PublishedIn = "P1433"
-    SourceOfFile = "P7482"
-    SourcingCircumstances = "P1480"
-    Title = "P1476"
-    Url = "P2699"
+try:
+    sys.path.append(os.path.dirname(os.path.abspath(__file__)) + '/lib')
+    from lib.bot import BaseBot
+    from lib.wikidata import WikidataEntity, WikidataProperty
+except:
+    from .lib.bot import BaseBot
+    from .lib.wikidata import WikidataEntity, WikidataProperty
 
 
 def parse_date(date: str) -> re.Match:
     return re.match(r'^(\d{4}(-\d{2}(-\d{2})?)?)$', date)
 
 
-class UsaceBot(ExistingPageBot):
+class UsaceBot(BaseBot):
     def __init__(self, **kwargs: Any):
         super().__init__(**kwargs)
 
-        if os.getenv('PWB_CONSUMER_TOKEN') and os.getenv('PWB_CONSUMER_SECRET') and os.getenv(
-                'PWB_ACCESS_TOKEN') and os.getenv('PWB_ACCESS_SECRET'):
-            authenticate = (
-                os.getenv('PWB_CONSUMER_TOKEN'),
-                os.getenv('PWB_CONSUMER_SECRET'),
-                os.getenv('PWB_ACCESS_TOKEN'),
-                os.getenv('PWB_ACCESS_SECRET'),
-            )
-            pwb.config.authenticate["commons.wikimedia.org"] = authenticate
-        else:
-            pwb.config.password_file = "user-password.py"
-
-        self.wikidata = Site("wikidata", "wikidata")
-        self.commons = Site("commons", "commons", user=os.getenv("PWB_USERNAME") or "CuratorBot")
-        self.commons.login()
-
         self.generator = SearchPageGenerator(f'file: deepcat:"Images from USACE" -haswbstatement:{WikidataProperty.SourceOfFile}', site=self.commons)
-        self.user_agent = f"{self.commons.username()} / Wikimedia Commons"
 
     def skip_page(self, page: BasePage) -> bool:
         return 'CuratorBot' != page.oldest_revision.user
@@ -88,54 +51,32 @@ class UsaceBot(ExistingPageBot):
         pprint(date)
         pprint(source)
 
-        new_claims = []
-        existing_claims = ClaimCollection.fromJSON(
+        self.new_claims = []
+        self.existing_claims = ClaimCollection.fromJSON(
             data=self.commons.simple_request(action="wbgetentities", ids=mid).submit()['entities'][mid]['statements'],
             repo=self.commons
         )
 
-        if date is not None and (inception_claim := self.process_inception_claim(existing_claims, date)) is not None:
-            new_claims.append(inception_claim.toJSON())
+        if date is not None:
+            self.process_inception_claim(date)
 
-        if (source_claim := self.process_source_claim(existing_claims, source)) is not None:
-            new_claims.append(source_claim.toJSON())
+        self.create_source_claim(source)
 
-        if not new_claims:
-            info("No claims to set")
+        self.save()
+
+    def process_inception_claim(self, date: str) -> None:
+        if WikidataProperty.Inception in self.existing_claims:
             return
 
-        payload = {
-            "action": "wbeditentity",
-            "id": mid,
-            "data": json.dumps({"claims": new_claims}),
-            "token": self.commons.get_tokens("csrf")['csrf'],
-            "summary": "add [[Commons:Structured data|SDC]] based on metadata. Task #3",
-            "tags": "BotSDC",
-            "bot": True,
-        }
-        request = self.commons.simple_request(**payload)
-
-        pprint(DeepDiff([], new_claims))
-
-        try:
-            start = perf_counter()
-            request.submit()
-            info(f"Updating {mid} took {(perf_counter() - start):.1f} s")
-        except Exception as e:
-            critical(f"Failed to update: {e}")
-
-    def process_inception_claim(self, existing_claims: ClaimCollection, date: str) -> Claim | None:
-        if WikidataProperty.Inception in existing_claims:
-            return None
-
         if (date_matches := parse_date(date)) is not None:
-            return self.create_inception_claim(date, date_matches)
+            self.create_inception_claim(date, date_matches)
+            return
 
         wikitext = mwparserfromhell.parse(date)
         complex_date = [t for t in wikitext.filter_templates() if t.name.matches("complex date")]
 
         if len(complex_date) != 1 or len(complex_date[0].params) != 2:
-            return None
+            return
 
         param0 = complex_date[0].params[0].value.get(0).value
         param1 = complex_date[0].params[1].value.get(0).value
@@ -144,9 +85,10 @@ class UsaceBot(ExistingPageBot):
             circa_qualifier = Claim(self.commons, WikidataProperty.SourcingCircumstances)
             circa_qualifier.setTarget(ItemPage(self.wikidata, WikidataEntity.Circa))
 
-            return self.create_inception_claim(param1, date_matches, [circa_qualifier])
+            self.create_inception_claim(param1, date_matches, [circa_qualifier])
+            return
 
-    def create_inception_claim(self, date: str, date_matches: re.Match, qualifiers: list[Claim] = ()) -> Claim:
+    def create_inception_claim(self, date: str, date_matches: re.Match, qualifiers: list[Claim] = ()) -> None:
         pprint(date_matches.groups())
 
         ts = Timestamp.fromisoformat(parser.isoparse(date).isoformat())
@@ -161,14 +103,14 @@ class UsaceBot(ExistingPageBot):
         for qualifier in qualifiers:
             claim.addQualifier(qualifier)
 
-        return claim
+        self.new_claims.append(claim.toJSON())
 
-    def process_source_claim(self, existing_claims: ClaimCollection, source: str) -> Claim | None:
-        if WikidataProperty.SourceOfFile in existing_claims:
-            return None
+    def create_source_claim(self, source: str) -> None:
+        if WikidataProperty.SourceOfFile in self.existing_claims:
+            return
 
         if re.match(r'^https://usace\.contentdm\.oclc\.org/digital/collection/p\d+coll\d+/id/\d+$', source) is None:
-            return None
+            return
 
         claim = Claim(self.commons, WikidataProperty.SourceOfFile)
         claim.setTarget(ItemPage(self.wikidata, WikidataEntity.FileAvailableOnInternet))
@@ -181,7 +123,7 @@ class UsaceBot(ExistingPageBot):
         qualifier_operator.setTarget(ItemPage(self.wikidata, WikidataEntity.USACE))
         claim.addQualifier(qualifier_operator)
 
-        return claim
+        self.new_claims.append(claim.toJSON())
 
 
 def main():

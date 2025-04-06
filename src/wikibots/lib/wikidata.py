@@ -1,0 +1,27 @@
+class WikidataEntity:
+    Circa = "Q5727902"
+    Copyrighted = "Q50423863"
+    DedicatedToPublicDomainByCopyrightOwner = "Q88088423"
+    FileAvailableOnInternet = "Q74228490"
+    PublicDomain = "Q19652"
+    StatedByCopyrightHolderAtSourceWebsite = "Q61045577"
+    USACE = 'Q1049334'
+    WorkOfTheFederalGovernmentOfTheUnitedStates = "Q60671452"
+
+
+class WikidataProperty:
+    AppliesToJurisdiction = "P1001"
+    AuthorName = "P2093"
+    CopyrightLicense = "P275"
+    CopyrightStatus = "P6216"
+    Creator = "P170"
+    DescribedAtUrl = "P973"
+    DeterminationMethod = "P459"
+    Inception = "P571"
+    Operator = "P137"
+    PublicationDate = "P577"
+    PublishedIn = "P1433"
+    SourceOfFile = "P7482"
+    SourcingCircumstances = "P1480"
+    Title = "P1476"
+    Url = "P2699"
