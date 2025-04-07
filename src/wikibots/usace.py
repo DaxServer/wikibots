@@ -62,7 +62,7 @@ class UsaceBot(BaseBot):
 
         self.create_source_claim(source)
 
-        self.save()
+        self.save('add [[Commons:Structured data|SDC]] based on metadata. Task #3')
 
     def process_inception_claim(self, date: str) -> None:
         if WikidataProperty.Inception in self.existing_claims:
@@ -112,18 +112,7 @@ class UsaceBot(BaseBot):
         if re.match(r'^https://usace\.contentdm\.oclc\.org/digital/collection/p\d+coll\d+/id/\d+$', source) is None:
             return
 
-        claim = Claim(self.commons, WikidataProperty.SourceOfFile)
-        claim.setTarget(ItemPage(self.wikidata, WikidataEntity.FileAvailableOnInternet))
-
-        qualifier_described_at_url = Claim(self.commons, WikidataProperty.DescribedAtUrl)
-        qualifier_described_at_url.setTarget(source)
-        claim.addQualifier(qualifier_described_at_url)
-
-        qualifier_operator = Claim(self.commons, WikidataProperty.Operator)
-        qualifier_operator.setTarget(ItemPage(self.wikidata, WikidataEntity.USACE))
-        claim.addQualifier(qualifier_operator)
-
-        self.new_claims.append(claim.toJSON())
+        super().create_source_claim(source, WikidataEntity.USACE)
 
 
 def main():
