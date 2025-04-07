@@ -7,11 +7,12 @@ class WikidataEntity:
     StatedByCopyrightHolderAtSourceWebsite = "Q61045577"
     USACE = 'Q1049334'
     WorkOfTheFederalGovernmentOfTheUnitedStates = "Q60671452"
+    YouTube = 'Q866'
 
 
 class WikidataProperty:
     AppliesToJurisdiction = "P1001"
-    AuthorName = "P2093"
+    AuthorNameString = "P2093"
     CopyrightLicense = "P275"
     CopyrightStatus = "P6216"
     Creator = "P170"
@@ -25,3 +26,6 @@ class WikidataProperty:
     SourcingCircumstances = "P1480"
     Title = "P1476"
     Url = "P2699"
+    YouTubeChannelId = "P2397"
+    YouTubeHandle = "P11245"
+    YouTubeVideoId = "P1651"

@@ -1,5 +1,6 @@
 import json
 import os
+import sys
 from pprint import pprint
 from time import perf_counter
 from typing import Any
@@ -17,51 +18,20 @@ from pywikibot.pagegenerators import SearchPageGenerator, PagesFromTitlesGenerat
 from pywikibot.scripts.generate_user_files import pywikibot
 from pywikibot.titletranslate import translate
 
-
-class WikidataEntity:
-    FileAvailableOnInternet = "Q74228490"
-    YouTube = 'Q866'
-
-
-class WikidataProperty:
-    AuthorNameString = "P2093"
-    CopyrightLicense = "P275"
-    Creator = "P170"
-    DescribedAtUrl = "P973"
-    Inception = "P571"
-    Operator = "P137"
-    PublicationDate = "P577"
-    PublishedIn = "P1433"
-    SourceOfFile = "P7482"
-    Title = "P1476"
-    Url = "P2699"
-    YouTubeChannelId = "P2397"
-    YouTubeHandle = "P11245"
-    YouTubeVideoId = "P1651"
+try:
+    sys.path.append(os.path.dirname(os.path.abspath(__file__)) + '/lib')
+    from lib.bot import BaseBot
+    from lib.wikidata import WikidataEntity, WikidataProperty
+except:
+    from .lib.bot import BaseBot
+    from .lib.wikidata import WikidataEntity, WikidataProperty
 
 
-class YouTubeBot(ExistingPageBot):
+class YouTubeBot(BaseBot):
     def __init__(self, **kwargs: Any):
         super().__init__(**kwargs)
 
-        if os.getenv('PWB_CONSUMER_TOKEN') and os.getenv('PWB_CONSUMER_SECRET') and os.getenv('PWB_ACCESS_TOKEN') and os.getenv('PWB_ACCESS_SECRET'):
-            authenticate = (
-                os.getenv('PWB_CONSUMER_TOKEN'),
-                os.getenv('PWB_CONSUMER_SECRET'),
-                os.getenv('PWB_ACCESS_TOKEN'),
-                os.getenv('PWB_ACCESS_SECRET'),
-            )
-            pywikibot.config.authenticate["commons.wikimedia.org"] = authenticate
-        else:
-            pywikibot.config.password_file = "user-password.py"
-
-        self.wikidata = Site("wikidata", "wikidata")
-        self.commons = Site("commons", "commons", user=os.getenv("PWB_USERNAME") or "YouTubeBot")
-        self.commons.login()
-
-        self.generator = PagesFromTitlesGenerator(['File:(TV텐) 위아이(WEi) 김준서, 내가 바로 화보장인.webm'], site=self.commons)
         self.generator = SearchPageGenerator(f'file: deepcat:"License reviewed by YouTubeReviewBot" filemime:video hastemplate:"YouTubeReview" -haswbstatement:{WikidataProperty.YouTubeVideoId}', site=self.commons)
-        self.user_agent = f"{self.commons.username()} / Wikimedia Commons"
 
         self.youtube = googleapiclient.discovery.build('youtube', 'v3', developerKey=os.getenv('YOUTUBE_API_KEY'))
         self.language_detector = LanguageDetectorBuilder.from_all_languages().build()
@@ -97,54 +67,32 @@ class YouTubeBot(ExistingPageBot):
         channel_handle = channel['items'][0]['snippet']['customUrl'].lstrip('@') if channel['pageInfo']['totalResults'] == 1 else None
         pprint(f'Channel handle: {channel_handle}')
 
-        new_claims = []
-        existing_claims = ClaimCollection.fromJSON(
+        self.new_claims = []
+        self.existing_claims = ClaimCollection.fromJSON(
             data=self.commons.simple_request(action="wbgetentities", ids=mid).submit()['entities'][mid]['statements'],
             repo=self.commons
         )
 
-        if (video_id_claim := self.process_youtube_video_id_claim(existing_claims, youtube_id.__str__())) is not None:
-            new_claims.append(video_id_claim.toJSON())
+        self.create_youtube_video_id_claim(youtube_id.__str__())
+        self.create_published_in_claim(published_at)
+        self.create_creator_claim(channel_title, channel_handle, channel_id)
+        self.create_source_claim(f'https://www.youtube.com/watch?v={youtube_id}')
+        self.process_copyright_license_claim(video_title, channel_title)
 
-        if (published_in_claim := self.process_published_in_claim(existing_claims, published_at)) is not None:
-            new_claims.append(published_in_claim.toJSON())
+        self.save('add [[Commons:Structured data|SDC]] based on metadata from YouTube. Test run.')
 
-        if (creator_claim := self.process_creator_claim(existing_claims, channel_title, channel_handle, channel_id)) is not None:
-            new_claims.append(creator_claim.toJSON())
-
-        if (source_claim := self.process_source_claim(existing_claims, f'https://www.youtube.com/watch?v={youtube_id}')) is not None:
-            new_claims.append(source_claim.toJSON())
-
-        if (license_claim := self.process_copyright_license_claim(existing_claims, video_title, channel_title)) is not None:
-            new_claims.append(license_claim.toJSON())
-
-        if not new_claims:
-            info("No claims to set")
+    def create_youtube_video_id_claim(self, videoId: str) -> None:
+        if WikidataProperty.YouTubeVideoId in self.existing_claims:
             return
 
-        payload = {
-            "action": "wbeditentity",
-            "id": mid,
-            "data": json.dumps({"claims": new_claims}),
-            "token": self.commons.get_tokens("csrf")['csrf'],
-            "summary": "add [[Commons:Structured data|SDC]] based on metadata from YouTube. Test run.",
-            "tags": "BotSDC",
-            "bot": True,
-        }
-        request = self.commons.simple_request(**payload)
+        claim = Claim(self.commons, WikidataProperty.YouTubeVideoId)
+        claim.setTarget(videoId)
 
-        pprint(DeepDiff([], new_claims))
+        self.new_claims.append(claim.toJSON())
 
-        try:
-            start = perf_counter()
-            request.submit()
-            info(f"Updating {mid} took {(perf_counter() - start):.1f} s")
-        except Exception as e:
-            critical(f"Failed to update: {e}")
-
-    def process_published_in_claim(self, existing_claims: ClaimCollection, date: str) -> Claim | None:
-        if WikidataProperty.PublishedIn in existing_claims:
-            return None
+    def create_published_in_claim(self, date: str) -> None:
+        if WikidataProperty.PublishedIn in self.existing_claims:
+            return
 
         claim = Claim(self.commons, WikidataProperty.PublishedIn)
         claim.setTarget(ItemPage(self.wikidata, WikidataEntity.YouTube))
@@ -156,11 +104,11 @@ class YouTubeBot(ExistingPageBot):
         published_date_qualifier.setTarget(wb_ts)
         claim.addQualifier(published_date_qualifier)
 
-        return claim
+        self.new_claims.append(claim.toJSON())
 
-    def process_creator_claim(self, existing_claims: ClaimCollection, channelTitle: str, channelHandle: str | None, channelId: str) -> Claim | None:
-        if WikidataProperty.Creator in existing_claims:
-            return None
+    def create_creator_claim(self, channelTitle: str, channelHandle: str | None, channelId: str) -> None:
+        if WikidataProperty.Creator in self.existing_claims:
+            return
 
         claim = Claim(self.commons, WikidataProperty.Creator)
         claim.setSnakType('somevalue')
@@ -178,39 +126,19 @@ class YouTubeBot(ExistingPageBot):
         youtube_channel_id_qualifier.setTarget(channelId)
         claim.addQualifier(youtube_channel_id_qualifier)
 
-        return claim
+        self.new_claims.append(claim.toJSON())
 
-    def process_youtube_video_id_claim(self, existing_claims: ClaimCollection, videoId: str) -> Claim | None:
-        if WikidataProperty.YouTubeVideoId in existing_claims:
-            return None
+    def create_source_claim(self, source: str) -> None:
+        if WikidataProperty.SourceOfFile in self.existing_claims:
+            return
 
-        claim = Claim(self.commons, WikidataProperty.YouTubeVideoId)
-        claim.setTarget(videoId)
+        super().create_source_claim(source, WikidataEntity.YouTube)
 
-        return claim
+    def process_copyright_license_claim(self, video_title: str, channel_title: str) -> None:
+        if WikidataProperty.CopyrightLicense not in self.existing_claims or len(self.existing_claims[WikidataProperty.CopyrightLicense]) != 1:
+            return
 
-    def process_source_claim(self, existing_claims: ClaimCollection, source: str) -> Claim | None:
-        if WikidataProperty.SourceOfFile in existing_claims:
-            return None
-
-        claim = Claim(self.commons, WikidataProperty.SourceOfFile)
-        claim.setTarget(ItemPage(self.wikidata, WikidataEntity.FileAvailableOnInternet))
-
-        described_at_url_qualifier = Claim(self.commons, WikidataProperty.DescribedAtUrl)
-        described_at_url_qualifier.setTarget(source)
-        claim.addQualifier(described_at_url_qualifier)
-
-        operator_qualifier = Claim(self.commons, WikidataProperty.Operator)
-        operator_qualifier.setTarget(ItemPage(self.wikidata, WikidataEntity.YouTube))
-        claim.addQualifier(operator_qualifier)
-
-        return claim
-
-    def process_copyright_license_claim(self, existing_claims: ClaimCollection, video_title: str, channel_title: str) -> Claim | None:
-        if WikidataProperty.CopyrightLicense not in existing_claims or len(existing_claims[WikidataProperty.CopyrightLicense]) != 1:
-            return None
-
-        claim: Claim = existing_claims[WikidataProperty.CopyrightLicense][0]
+        claim: Claim = self.existing_claims[WikidataProperty.CopyrightLicense][0]
         edited = False
 
         if WikidataProperty.Title not in claim.qualifiers:
@@ -228,7 +156,8 @@ class YouTubeBot(ExistingPageBot):
             claim.addQualifier(author_name_string_qualifier)
             edited = True
 
-        return claim if edited else None
+        if edited:
+            self.new_claims.append(claim.toJSON())
 
 
 def main():
