@@ -5,7 +5,7 @@ from time import perf_counter
 from typing import Any
 
 from deepdiff import DeepDiff
-from pywikibot import Site, info, critical
+from pywikibot import Site, info, critical, Claim, ItemPage
 from pywikibot.bot import ExistingPageBot
 from pywikibot.page._collections import ClaimCollection
 from pywikibot.scripts.wrapper import pwb
@@ -38,10 +38,24 @@ class BaseBot(ExistingPageBot):
 
         self.user_agent = f"{self.commons.username()} / Wikimedia Commons"
 
-        self.existing_claims: ClaimCollection
-        self.new_claims = []
+        self.existing_claims: ClaimCollection = ClaimCollection(repo=self.commons)
+        self.new_claims: list[dict] = []
 
-    def save(self):
+    def create_source_claim(self, source: str, operator: str) -> None:
+        claim = Claim(self.commons, WikidataProperty.SourceOfFile)
+        claim.setTarget(ItemPage(self.wikidata, WikidataEntity.FileAvailableOnInternet))
+
+        described_at_url_qualifier = Claim(self.commons, WikidataProperty.DescribedAtUrl)
+        described_at_url_qualifier.setTarget(source)
+        claim.addQualifier(described_at_url_qualifier)
+
+        operator_qualifier = Claim(self.commons, WikidataProperty.Operator)
+        operator_qualifier.setTarget(ItemPage(self.wikidata, operator))
+        claim.addQualifier(operator_qualifier)
+
+        self.new_claims.append(claim.toJSON())
+
+    def save(self, summary: str) -> None:
         if not self.new_claims:
             info("No claims to set")
             return
@@ -53,7 +67,7 @@ class BaseBot(ExistingPageBot):
             "id": mid,
             "data": json.dumps({"claims": self.new_claims}),
             "token": self.commons.get_tokens("csrf")['csrf'],
-            "summary": "add [[Commons:Structured data|SDC]] based on metadata. Task #3",
+            "summary": summary,
             "tags": "BotSDC",
             "bot": True,
         }
