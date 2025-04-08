@@ -29,6 +29,14 @@ except:
 
 class YouTubeBot(BaseBot):
     def __init__(self, **kwargs: Any):
+        """
+        Initializes the YouTubeBot instance.
+        
+        Passes any keyword arguments to the base class initializer and configures key components:
+          - A search generator to locate Commons files using the "YouTubeReview" template that lack a YouTube video ID.
+          - A YouTube API client built with the API key from the environment.
+          - A language detector constructed from all available languages.
+        """
         super().__init__(**kwargs)
 
         self.generator = SearchPageGenerator(f'file: deepcat:"License reviewed by YouTubeReviewBot" filemime:video hastemplate:"YouTubeReview" -haswbstatement:{WikidataProperty.YouTubeVideoId}', site=self.commons)
@@ -37,6 +45,16 @@ class YouTubeBot(BaseBot):
         self.language_detector = LanguageDetectorBuilder.from_all_languages().build()
 
     def treat_page(self) -> None:
+        """
+        Processes the page to extract YouTube metadata and update Wikidata claims.
+        
+        Parses the current page's wikitext to retrieve the YouTube video ID from a 
+        "YouTubeReview" template, then uses the YouTube API to fetch video details such as 
+        the title, publication date, and channel information. If valid video data is found, 
+        it creates or updates claims for the video ID, publication date, creator details, 
+        source URL, and copyright license. If the video is not found, the method exits 
+        without making changes. Finally, it saves the updates with a descriptive edit summary.
+        """
         mid = f'M{self.current_page.pageid}'
         info(self.current_page.full_url())
         info(mid)
@@ -82,6 +100,12 @@ class YouTubeBot(BaseBot):
         self.save('add [[Commons:Structured data|SDC]] based on metadata from YouTube. Test run.')
 
     def create_youtube_video_id_claim(self, videoId: str) -> None:
+        """
+        Creates a YouTube video ID claim if one is not already present.
+        
+        If no claim for the YouTube video ID exists, this method creates a new claim using
+        the provided videoId and appends its JSON representation to the list of new claims.
+        """
         if WikidataProperty.YouTubeVideoId in self.existing_claims:
             return
 
@@ -91,6 +115,17 @@ class YouTubeBot(BaseBot):
         self.new_claims.append(claim.toJSON())
 
     def create_published_in_claim(self, date: str) -> None:
+        """
+        Creates a published-in claim with a publication date qualifier.
+        
+        If a PublishedIn claim already exists, no claim is created. Otherwise, this
+        method constructs a new claim linking the video to YouTube and adds a qualifier
+        for the publication date (normalized to day precision from the provided ISO date
+        string). The new claim is then added in JSON format to the list of pending claims.
+        
+        Args:
+            date (str): The video's publication date in ISO format.
+        """
         if WikidataProperty.PublishedIn in self.existing_claims:
             return
 
@@ -107,6 +142,18 @@ class YouTubeBot(BaseBot):
         self.new_claims.append(claim.toJSON())
 
     def create_creator_claim(self, channelTitle: str, channelHandle: str | None, channelId: str) -> None:
+        """
+        Creates a creator claim with channel information.
+        
+        If no creator claim exists, constructs a new claim that includes qualifiers for the 
+        channel title, handle (if provided), and channel ID, then appends the serialized claim 
+        to the list of new claims.
+        
+        Args:
+            channelTitle: The channel title used as the author name qualifier.
+            channelHandle: The channel handle used as a qualifier, if available.
+            channelId: The unique YouTube channel identifier used as a qualifier.
+        """
         if WikidataProperty.Creator in self.existing_claims:
             return
 
@@ -129,12 +176,33 @@ class YouTubeBot(BaseBot):
         self.new_claims.append(claim.toJSON())
 
     def create_source_claim(self, source: str) -> None:
+        """
+        Creates a YouTube source claim if one does not already exist.
+        
+        If no source claim has been recorded, this method delegates claim creation to the
+        parent class, linking the file to YouTube using the provided source identifier.
+        
+        Args:
+            source: A string representing the source identifier used in the claim.
+        """
         if WikidataProperty.SourceOfFile in self.existing_claims:
             return
 
         super().create_source_claim(source, WikidataEntity.YouTube)
 
     def process_copyright_license_claim(self, video_title: str, channel_title: str) -> None:
+        """
+        Add missing title and author name qualifiers to the existing copyright license claim.
+        
+        If exactly one copyright license claim exists, this method adds a title qualifier using the
+        provided video title (with its language detected) and an author name qualifier using the given
+        channel title if they are not already present. If any qualifier is added, the updated claim is
+        appended to the list of new claims.
+            
+        Args:
+            video_title: The video's title used for the title qualifier.
+            channel_title: The channel's title used for the author name qualifier.
+        """
         if WikidataProperty.CopyrightLicense not in self.existing_claims or len(self.existing_claims[WikidataProperty.CopyrightLicense]) != 1:
             return
 
@@ -161,6 +229,12 @@ class YouTubeBot(BaseBot):
 
 
 def main():
+    """
+    Entrypoint for running the YouTube bot.
+    
+    Instantiates the YouTubeBot and initiates its execution, starting the process of
+    retrieving video metadata and updating corresponding Wikidata claims.
+    """
     YouTubeBot().run()
 
 
