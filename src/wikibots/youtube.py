@@ -2,22 +2,16 @@ import json
 import os
 import sys
 from pprint import pprint
-from time import perf_counter
 from typing import Any
 
 import googleapiclient.discovery
 import googleapiclient.errors
 import mwparserfromhell
 from dateutil.parser import isoparse
-from deepdiff import DeepDiff
 from lingua.lingua import LanguageDetectorBuilder
-from pywikibot import Site, textlib, Claim, ItemPage, info, critical, Timestamp, WbTime, WbMonolingualText
-from pywikibot.bot import ExistingPageBot
+from pywikibot import Claim, ItemPage, info, Timestamp, WbTime, WbMonolingualText
 from pywikibot.page._collections import ClaimCollection
-from pywikibot.pagegenerators import SearchPageGenerator, PagesFromTitlesGenerator
-from pywikibot.scripts.generate_user_files import pywikibot
-from pywikibot.titletranslate import translate
-
+from pywikibot.pagegenerators import SearchPageGenerator
 try:
     sys.path.append(os.path.dirname(os.path.abspath(__file__)) + '/lib')
     from lib.bot import BaseBot
@@ -61,14 +55,28 @@ class YouTubeBot(BaseBot):
 
         wikitext = mwparserfromhell.parse(self.current_page.text)
 
-        youtube_id = [w for w in wikitext.filter_templates() if w.name == 'YouTubeReview'][0].get('id').value
+        youtube_templates = [w for w in wikitext.filter_templates() if w.name == 'YouTubeReview']
+        if not youtube_templates:
+            info(f"No YouTubeReview template found on {self.current_page.title()}")
+            return
+        
+        template = youtube_templates[0]
+        if not template.has('id'):
+            info(f"YouTubeReview template on {self.current_page.title()} is missing the id parameter")
+            return
+        
+        youtube_id = template.get('id').value
         pprint(f'Video ID: {youtube_id}')
 
-        video = self.youtube.videos().list(part="snippet", id=youtube_id).execute()
-
-        if video['pageInfo']['totalResults'] == 0:
+        try:
+            video = self.youtube.videos().list(part="snippet", id=youtube_id).execute()
+            
+            if video['pageInfo']['totalResults'] == 0:
+                info(f"No video found with ID {youtube_id}")
+                return
+        except googleapiclient.errors.HttpError as e:
+            info(f"Error fetching video data: {str(e)}")
             return
-
         video_title = video['items'][0]['snippet']['localized']['title']
         pprint(f'Video title: {video_title}')
 
@@ -210,12 +218,18 @@ class YouTubeBot(BaseBot):
         edited = False
 
         if WikidataProperty.Title not in claim.qualifiers:
-            language = self.language_detector.detect_language_of(video_title)
-            pprint(language.name)
-
-            title_qualifier = Claim(self.commons, WikidataProperty.Title)
-            title_qualifier.setTarget(WbMonolingualText(video_title, language.iso_code_639_1.name.lower()))
-            claim.addQualifier(title_qualifier)
+            try:
+                language = self.language_detector.detect_language_of(video_title)
+                if hasattr(language, 'iso_code_639_1') and language.iso_code_639_1:
+                    lang_code = language.iso_code_639_1.name.lower()
+                    title_qualifier = Claim(self.commons, WikidataProperty.Title)
+                    title_qualifier.setTarget(WbMonolingualText(video_title, lang_code))
+                    claim.addQualifier(title_qualifier)
+                    edited = True
+                else:
+                    info(f"Could not determine ISO 639-1 code for detected language: {language.name}")
+            except Exception as e:
+                info(f"Language detection failed: {str(e)}")
             edited = True
 
         if WikidataProperty.AuthorNameString not in claim.qualifiers:
