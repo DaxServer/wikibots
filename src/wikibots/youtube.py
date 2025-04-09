@@ -230,8 +230,6 @@ class YouTubeBot(BaseBot):
                     info(f"Could not determine ISO 639-1 code for detected language: {language.name}")
             except Exception as e:
                 info(f"Language detection failed: {str(e)}")
-            edited = True
-
         if WikidataProperty.AuthorNameString not in claim.qualifiers:
             author_name_string_qualifier = Claim(self.commons, WikidataProperty.AuthorNameString)
             author_name_string_qualifier.setTarget(channel_title)
