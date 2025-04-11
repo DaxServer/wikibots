@@ -37,7 +37,7 @@ class FlickrBot(BaseBot):
             url_qualifier: Claim = _q[0] if _q else Claim(self.commons, WikidataProperty.Url)
             url_qualifier.setTarget('https://commons.wikimedia.org/wiki/User:Jmabel')
 
-            self.new_claims.append(url_qualifier.toJSON())
+            creator_claim.addQualifier(url_qualifier)
 
         WikimediaUsername = 'P4174'
 
@@ -46,8 +46,9 @@ class FlickrBot(BaseBot):
             wikimedia_username_qualifier: Claim = _q[0] if _q else Claim(self.commons, WikimediaUsername)
             wikimedia_username_qualifier.setTarget('Jmabel')
 
-            self.new_claims.append(wikimedia_username_qualifier.toJSON())
+            creator_claim.addQualifier(wikimedia_username_qualifier)
 
+        self.new_claims.append(creator_claim.toJSON())
         self.save('add [[Commons:Structured data|SDC]] based on Flickr metadata. Task #2')
 
 
