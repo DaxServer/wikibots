@@ -3,6 +3,7 @@ class WikidataEntity:
     Copyrighted = "Q50423863"
     DedicatedToPublicDomainByCopyrightOwner = "Q88088423"
     FileAvailableOnInternet = "Q74228490"
+    Flickr = "Q103204"
     PublicDomain = "Q19652"
     StatedByCopyrightHolderAtSourceWebsite = "Q61045577"
     USACE = 'Q1049334'

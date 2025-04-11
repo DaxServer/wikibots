@@ -38,8 +38,23 @@ class BaseBot(ExistingPageBot):
 
         self.user_agent = f"{self.commons.username()} / Wikimedia Commons"
 
+        self.mid: str = ''
         self.existing_claims: ClaimCollection = ClaimCollection(repo=self.commons)
         self.new_claims: list[dict] = []
+
+    def treat_page(self) -> None:
+        self.mid = f'M{self.current_page.pageid}'
+        info(self.current_page.full_url())
+        info(self.mid)
+
+    def fetch_claims(self, mid: str | None = None) -> None:
+        mid = mid or self.mid
+
+        self.new_claims = []
+        self.existing_claims = ClaimCollection.fromJSON(
+            data=self.commons.simple_request(action="wbgetentities", ids=mid).submit()['entities'][mid]['statements'],
+            repo=self.commons
+        )
 
     def create_source_claim(self, source: str, operator: str) -> None:
         claim = Claim(self.commons, WikidataProperty.SourceOfFile)
@@ -81,3 +96,5 @@ class BaseBot(ExistingPageBot):
             info(f"Updating {mid} took {(perf_counter() - start):.1f} s")
         except Exception as e:
             critical(f"Failed to update: {e}")
+
+        self.new_claims = []
