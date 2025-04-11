@@ -7,7 +7,6 @@ import googleapiclient.discovery
 import googleapiclient.errors
 import mwparserfromhell
 from dateutil.parser import isoparse
-from lingua.lingua import LanguageDetectorBuilder
 from pywikibot import Claim, ItemPage, info, Timestamp, WbTime, WbMonolingualText, warning, error
 from pywikibot.page._collections import ClaimCollection
 from pywikibot.pagegenerators import SearchPageGenerator
@@ -36,7 +35,6 @@ class YouTubeBot(BaseBot):
         self.generator = SearchPageGenerator(f'file: deepcat:"License reviewed by YouTubeReviewBot" filemime:video hastemplate:"YouTubeReview" -haswbstatement:{WikidataProperty.YouTubeVideoId}', site=self.commons)
 
         self.youtube = googleapiclient.discovery.build('youtube', 'v3', developerKey=os.getenv('YOUTUBE_API_KEY'))
-        self.language_detector = LanguageDetectorBuilder.from_all_languages().build()
 
     def treat_page(self) -> None:
         """
@@ -82,7 +80,6 @@ class YouTubeBot(BaseBot):
         self.create_published_in_claim(video_data['published_at'])
         self.create_creator_claim(video_data['video_title'], video_data['channel_handle'], video_data['channel_id'])
         self.create_source_claim(f'https://www.youtube.com/watch?v={youtube_id}', WikidataEntity.YouTube)
-        self.process_copyright_license_claim(video_data['video_title'], video_data['channel_title'])
 
         self.save('add [[Commons:Structured data|SDC]] based on metadata from YouTube. Test run.')
 
@@ -224,52 +221,6 @@ class YouTubeBot(BaseBot):
             return
 
         super().create_source_claim(source, operator)
-
-    def process_copyright_license_claim(self, video_title: str, channel_title: str) -> None:
-        """
-        Add missing title and author name qualifiers to the existing copyright license claim.
-        
-        If exactly one copyright license claim exists, this method adds a title qualifier using the
-        provided video title (with its language detected) and an author name qualifier using the given
-        channel title if they are not already present. If any qualifier is added, the updated claim is
-        appended to the list of new claims.
-
-        :param str video_title: The title of the video used for the title qualifier
-        :param str channel_title: The title of the channel used for the author name qualifier
-        :rtype: None
-        """
-        if WikidataProperty.CopyrightLicense not in self.existing_claims or len(self.existing_claims[WikidataProperty.CopyrightLicense]) != 1:
-            return
-
-        claim: Claim = self.existing_claims[WikidataProperty.CopyrightLicense][0]
-        edited = False
-
-        if WikidataProperty.Title not in claim.qualifiers:
-            try:
-                language = self.language_detector.detect_language_of(video_title)
-                info(language)
-
-                if hasattr(language, 'iso_code_639_1') and language.iso_code_639_1:
-                    lang_code = language.iso_code_639_1.name.lower()
-                    edited = True
-
-                    title_qualifier = Claim(self.commons, WikidataProperty.Title)
-                    title_qualifier.setTarget(WbMonolingualText(video_title, lang_code))
-                    claim.addQualifier(title_qualifier)
-                else:
-                    warning(f"Could not determine ISO 639-1 code for detected language: {language.name}")
-            except Exception as e:
-                error(f"Language detection failed: {str(e)}")
-
-        if WikidataProperty.AuthorNameString not in claim.qualifiers:
-            author_name_string_qualifier = Claim(self.commons, WikidataProperty.AuthorNameString)
-            author_name_string_qualifier.setTarget(channel_title)
-            claim.addQualifier(author_name_string_qualifier)
-
-            edited = True
-
-        if edited:
-            self.new_claims.append(claim.toJSON())
 
 
 def main():

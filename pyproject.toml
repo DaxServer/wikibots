@@ -12,7 +12,6 @@ dependencies = [
     "deepdiff (>=8.4.2,<9.0.0)",
     "requests-oauthlib (>=2.0.0,<3.0.0)",
     "google-api-python-client (>=2.166.0,<3.0.0)",
-    "lingua-language-detector (>=2.1.0,<3.0.0)",
 ]
 
 [tool.poetry]
