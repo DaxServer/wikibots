@@ -7,6 +7,7 @@ from typing import Any
 from deepdiff import DeepDiff
 from pywikibot import Site, info, critical, Claim, ItemPage
 from pywikibot.bot import ExistingPageBot
+from pywikibot.data.api import Request
 from pywikibot.page._collections import ClaimCollection
 from pywikibot.scripts.wrapper import pwb
 
@@ -47,14 +48,12 @@ class BaseBot(ExistingPageBot):
         info(self.current_page.full_url())
         info(self.mid)
 
-    def fetch_claims(self, mid: str | None = None) -> None:
-        mid = mid or self.mid
+    def fetch_claims(self) -> None:
+        request: Request = self.commons.simple_request(action="wbgetentities", ids=self.mid)
+        statements = request.submit().get('entities').get(self.mid).get('statements', [])
 
         self.new_claims = []
-        self.existing_claims = ClaimCollection.fromJSON(
-            data=self.commons.simple_request(action="wbgetentities", ids=mid).submit()['entities'][mid]['statements'],
-            repo=self.commons
-        )
+        self.existing_claims = ClaimCollection.fromJSON(data=statements, repo=self.commons)
 
     def create_source_claim(self, source: str, operator: str) -> None:
         claim = Claim(self.commons, WikidataProperty.SourceOfFile)

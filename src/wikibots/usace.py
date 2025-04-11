@@ -39,23 +39,17 @@ class UsaceBot(BaseBot):
         return 'CuratorBot' != page.oldest_revision.user
 
     def treat_page(self) -> None:
-        info(self.current_page.full_url())
+        super().treat_page()
+        self.fetch_claims()
 
-        mid = f'M{self.current_page.pageid}'
         templ = textlib.extract_templates_and_params(self.current_page.text, True, True)
 
         photograph = list(filter(lambda t: t[0] == 'Photograph' or t[0] == 'Book', templ))[0]
         date = photograph[1]['date'] if 'date' in photograph[1] else None
         source = photograph[1]['source'] if 'source' in photograph[1] else ''
 
-        pprint(date)
-        pprint(source)
-
-        self.new_claims = []
-        self.existing_claims = ClaimCollection.fromJSON(
-            data=self.commons.simple_request(action="wbgetentities", ids=mid).submit()['entities'][mid]['statements'],
-            repo=self.commons
-        )
+        info(date)
+        info(source)
 
         if date is not None:
             self.process_inception_claim(date)
