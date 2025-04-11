@@ -29,7 +29,7 @@ class FlickrBot(BaseBot):
 
         creator_claim: Claim = self.existing_claims[WikidataProperty.Creator][0]
 
-        if not creator_claim.has_qualifier(WikidataProperty.AuthorNameString, 'Joe Mabel'):
+        if not creator_claim.has_qualifier(WikidataProperty.AuthorName, 'Joe Mabel'):
             return
 
         if not creator_claim.has_qualifier(WikidataProperty.Url, 'https://commons.wikimedia.org/wiki/User:Jmabel'):
