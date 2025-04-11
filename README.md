@@ -5,13 +5,13 @@
 For main branch:
 
 ```bash
-toolforge build start --image <IMAGE-NAME> https://github.com/DaxServer/wikibots.git
+toolforge build start -i <IMAGE-NAME> https://github.com/DaxServer/wikibots.git
 ```
 
 For a specific branch:
 
 ```bash
-toolforge build start --image <IMAGE-NAME> https://github.com/DaxServer/wikibots.git --ref <BRANCH>
+toolforge build start -i <IMAGE-NAME> https://github.com/DaxServer/wikibots.git --ref <BRANCH>
 ```
 
 ## Deploying
