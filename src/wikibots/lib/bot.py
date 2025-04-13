@@ -74,11 +74,9 @@ class BaseBot(ExistingPageBot):
             info("No claims to set")
             return
 
-        mid = f'M{self.current_page.pageid}'
-
         payload = {
             "action": "wbeditentity",
-            "id": mid,
+            "id": self.mid,
             "data": json.dumps({"claims": self.new_claims}),
             "token": self.commons.get_tokens("csrf")['csrf'],
             "summary": summary,
@@ -92,8 +90,9 @@ class BaseBot(ExistingPageBot):
         try:
             start = perf_counter()
             request.submit()
-            info(f"Updating {mid} took {(perf_counter() - start):.1f} s")
+            info(f"Updating {self.mid} took {(perf_counter() - start):.1f} s")
         except Exception as e:
             critical(f"Failed to update: {e}")
 
+        self.mid = ''
         self.new_claims = []
