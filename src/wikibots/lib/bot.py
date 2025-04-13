@@ -56,6 +56,9 @@ class BaseBot(ExistingPageBot):
         self.existing_claims = ClaimCollection.fromJSON(data=statements, repo=self.commons)
 
     def create_source_claim(self, source: str, operator: str) -> None:
+        if WikidataProperty.SourceOfFile in self.existing_claims:
+            return
+
         claim = Claim(self.commons, WikidataProperty.SourceOfFile)
         claim.setTarget(ItemPage(self.wikidata, WikidataEntity.FileAvailableOnInternet))
 
