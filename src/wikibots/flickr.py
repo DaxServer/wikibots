@@ -1,6 +1,7 @@
 import datetime
 import os
 import sys
+import time
 from time import perf_counter
 from typing import Any
 
@@ -9,8 +10,8 @@ from flickr_photos_api import FlickrApi, PhotoIsPrivate, ResourceNotFound, Singl
     DateTaken
 from flickr_url_parser import parse_flickr_url
 from mwparserfromhell.wikicode import Wikicode
-from pywikibot import Claim, Category, info, warning, error, Coordinate, WbTime, Timestamp, ItemPage
-from pywikibot.pagegenerators import CategorizedPageGenerator
+from pywikibot import Claim, info, warning, error, Coordinate, WbTime, Timestamp, ItemPage
+from pywikibot.pagegenerators import SearchPageGenerator
 from redis import Redis
 
 try:
@@ -26,7 +27,7 @@ class FlickrBot(BaseBot):
     def __init__(self, **kwargs: Any):
         super().__init__(**kwargs)
 
-        self.generator = CategorizedPageGenerator(Category(self.commons, 'Flickr images missing SDC creator'), namespaces=[6])
+        self.generator = SearchPageGenerator(f'file: deepcat:"Images from Flickr" -haswbstatement:{WikidataProperty.FlickrPhotoId}', site=self.commons)
 
         self.flickr_api = FlickrApi.with_api_key(api_key=os.getenv("FLICKR_API_KEY"), user_agent=self.user_agent)
         self.redis = Redis(host='redis.svc.tools.eqiad1.wikimedia.cloud', db=9)
