@@ -258,7 +258,7 @@ class FlickrBot(BaseBot):
             return
 
         claim = Claim(self.commons, WikidataProperty.CoordinatesOfThePointOfView)
-        claim.setTarget(Coordinate(location["latitude"], location["longitude"], wikidata_precision))
+        claim.setTarget(Coordinate(location["latitude"], location["longitude"], precision=wikidata_precision))
 
         self.new_claims.append(claim.toJSON())
 
