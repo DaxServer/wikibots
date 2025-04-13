@@ -272,7 +272,6 @@ class FlickrBot(BaseBot):
             error(f'Unrecognised date granularity: {date_taken}')
             return
 
-        ts = Timestamp.fromISOformat(date_taken['value'].isoformat())
         precision = precision_map[date_taken['granularity']]
 
         year = date_taken['value'].year
