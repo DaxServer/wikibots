@@ -27,7 +27,7 @@ class FlickrBot(BaseBot):
     def __init__(self, **kwargs: Any):
         super().__init__(**kwargs)
 
-        self.generator = SearchPageGenerator(f'file: deepcat:"Files from Flickr" -haswbstatement:{WikidataProperty.FlickrPhotoId}', site=self.commons)
+        self.generator = SearchPageGenerator(f'file: incategory:"Flickr images reviewed by FlickreviewR 2" -haswbstatement:{WikidataProperty.FlickrPhotoId} hastemplate:"FlickreviewR"', site=self.commons)
 
         self.flickr_api = FlickrApi.with_api_key(api_key=os.getenv("FLICKR_API_KEY"), user_agent=self.user_agent)
         self.redis = Redis(host='redis.svc.tools.eqiad1.wikimedia.cloud', db=9)
@@ -40,11 +40,6 @@ class FlickrBot(BaseBot):
         # Check Redis cache to avoid processing the same page multiple times
         if self.redis.get(redis_key) is not None:
             warning('Skipping due to Redis cache')
-            return
-
-        if 'Flickr images reviewed by FlickreviewR 2' not in [c.title(with_ns=False) for c in self.current_page.categories()]:
-            warning('Skipping as it is not in the Flickr images reviewed by FlickreviewR 2 category')
-            self.redis.set(redis_key, 1)
             return
 
         wikitext: Wikicode = mwparserfromhell.parse(self.current_page.text)
