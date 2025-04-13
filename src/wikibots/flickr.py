@@ -52,10 +52,9 @@ class FlickrBot(BaseBot):
             creator_claim.addQualifier(wikimedia_username_qualifier)
             edited = True
 
-        if not edited:
-            return
+        if edited:
+            self.new_claims.append(creator_claim.toJSON())
 
-        self.new_claims.append(creator_claim.toJSON())
         self.save('add [[Commons:Structured data|SDC]] based on Flickr metadata. Task #2')
 
 
