@@ -27,7 +27,7 @@ class FlickrBot(BaseBot):
     def __init__(self, **kwargs: Any):
         super().__init__(**kwargs)
 
-        self.generator = SearchPageGenerator(f'file: deepcat:"Images from Flickr" -haswbstatement:{WikidataProperty.FlickrPhotoId}', site=self.commons)
+        self.generator = SearchPageGenerator(f'file: deepcat:"Files from Flickr" -haswbstatement:{WikidataProperty.FlickrPhotoId}', site=self.commons)
 
         self.flickr_api = FlickrApi.with_api_key(api_key=os.getenv("FLICKR_API_KEY"), user_agent=self.user_agent)
         self.redis = Redis(host='redis.svc.tools.eqiad1.wikimedia.cloud', db=9)
