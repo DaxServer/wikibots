@@ -35,44 +35,9 @@ class FlickrBot(BaseBot):
 
     def treat_page(self) -> None:
         super().treat_page()
-        redis_key = f'{self.redis_prefix}:commons:{self.mid}'
 
-        # Check Redis cache to avoid processing the same page multiple times
-        if self.redis.get(redis_key) is not None:
-            warning('Skipping due to Redis cache')
-            return
-
-        wikitext: Wikicode = mwparserfromhell.parse(self.current_page.text)
-        flickr_review = list(filter(lambda t: t.name == 'FlickreviewR', wikitext.filter_templates()))
-
-        if len(flickr_review) != 1:
-            warning('Skipping as it does not have a valid FlickreviewR template')
-            self.redis.set(redis_key, 1)
-            return
-
-        flickr_url = list(filter(lambda p: p.name == 'sourceurl', flickr_review[0].params))
-
-        if len(flickr_url) != 1:
-            warning('Skipping as FlickreviewR does not have a valid sourceurl parameter')
-            self.redis.set(redis_key, 1)
-            return
-
-        flickr_url = str(flickr_url[0].value)
-        info(flickr_url)
-
-        flickr_id = parse_flickr_url(flickr_url)
-        info(flickr_id)
-
-        if flickr_id.get('type') != 'single_photo':
-            warning('Skipping as it is not a single photo in Flickr')
-            self.redis.set(redis_key, 1)
-            return
-
-        flickr_photo = self.get_flickr_photo(flickr_id['photo_id'])
-
+        flickr_photo = self.extract_flickr_data()
         if flickr_photo is None:
-            warning('Skipping as photo not found in Flickr')
-            self.redis.set(redis_key, 1)
             return
 
         self.fetch_claims()
@@ -84,6 +49,44 @@ class FlickrBot(BaseBot):
         self.create_published_in_claim(flickr_photo['date_posted'])
 
         self.save('add [[Commons:Structured data|SDC]] based on metadata from Flickr. Task #2')
+
+    def extract_flickr_data(self) -> SinglePhoto | None:
+        redis_key = f'{self.redis_prefix}:commons:{self.mid}'
+
+        wikitext: Wikicode = mwparserfromhell.parse(self.current_page.text)
+        flickr_review = list(filter(lambda t: t.name == 'FlickreviewR', wikitext.filter_templates()))
+
+        if len(flickr_review) != 1:
+            warning('Skipping as it does not have a valid FlickreviewR template')
+            self.redis.set(redis_key, 1)
+            return None
+
+        flickr_url = list(filter(lambda p: p.name == 'sourceurl', flickr_review[0].params))
+
+        if len(flickr_url) != 1:
+            warning('Skipping as FlickreviewR does not have a valid sourceurl parameter')
+            self.redis.set(redis_key, 1)
+            return None
+
+        flickr_url = str(flickr_url[0].value)
+        info(flickr_url)
+
+        flickr_id = parse_flickr_url(flickr_url)
+        info(flickr_id)
+
+        if flickr_id.get('type') != 'single_photo':
+            warning('Skipping as it is not a single photo in Flickr')
+            self.redis.set(redis_key, 1)
+            return None
+
+        flickr_photo = self.get_flickr_photo(flickr_id['photo_id'])
+
+        if flickr_photo is None:
+            warning('Skipping as photo not found in Flickr')
+            self.redis.set(redis_key, 1)
+            return None
+
+        return flickr_photo
 
     def get_flickr_photo(self, flickr_photo_id: str) -> SinglePhoto | None:
         single_photo = None
