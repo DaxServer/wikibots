@@ -24,6 +24,9 @@ except:
 
 
 class FlickrBot(BaseBot):
+    redis_prefix = 'xQ6cz5J84Viw/K6FIcOH1kxJjfiS8jO56AoSmhBgO/A='
+    summary = 'add [[Commons:Structured data|SDC]] based on metadata from Flickr. Task #2'
+
     def __init__(self, **kwargs: Any):
         super().__init__(**kwargs)
 
@@ -31,16 +34,16 @@ class FlickrBot(BaseBot):
 
         self.flickr_api = FlickrApi.with_api_key(api_key=os.getenv("FLICKR_API_KEY"), user_agent=self.user_agent)
         self.redis = Redis(host='redis.svc.tools.eqiad1.wikimedia.cloud', db=9)
-        self.redis_prefix = 'xQ6cz5J84Viw/K6FIcOH1kxJjfiS8jO56AoSmhBgO/A='
 
     def treat_page(self) -> None:
         super().treat_page()
+        self.fetch_claims()
 
         flickr_photo = self.extract_flickr_data()
         if flickr_photo is None:
+            self.save()
             return
 
-        self.fetch_claims()
         self.create_id_claim(flickr_photo['id'])
         self.create_creator_claim(flickr_photo['owner'])
         self.create_source_claim(flickr_photo['url'], WikidataEntity.Flickr)
@@ -48,7 +51,7 @@ class FlickrBot(BaseBot):
         self.create_inception_claim(flickr_photo['date_taken'])
         self.create_published_in_claim(flickr_photo['date_posted'])
 
-        self.save('add [[Commons:Structured data|SDC]] based on metadata from Flickr. Task #2')
+        self.save()
 
     def extract_flickr_data(self) -> SinglePhoto | None:
         redis_key = f'{self.redis_prefix}:commons:{self.mid}'
@@ -82,7 +85,7 @@ class FlickrBot(BaseBot):
         flickr_photo = self.get_flickr_photo(flickr_id['photo_id'])
 
         if flickr_photo is None:
-            warning('Skipping as photo not found in Flickr')
+            self.create_id_claim(flickr_id['photo_id'])
             self.redis.set(redis_key, 1)
             return None
 
