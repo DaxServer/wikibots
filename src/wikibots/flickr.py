@@ -37,13 +37,13 @@ class FlickrBot(BaseBot):
 
     def treat_page(self) -> None:
         super().treat_page()
+        self.fetch_claims()
 
         flickr_photo = self.extract_flickr_data()
         if flickr_photo is None:
             self.save()
             return
 
-        self.fetch_claims()
         self.create_id_claim(flickr_photo['id'])
         self.create_creator_claim(flickr_photo['owner'])
         self.create_source_claim(flickr_photo['url'], WikidataEntity.Flickr)
