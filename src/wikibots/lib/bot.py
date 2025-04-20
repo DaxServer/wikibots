@@ -18,6 +18,10 @@ except:
 
 
 class BaseBot(ExistingPageBot):
+    summary = 'add [[Commons:Structured data|SDC]] based on metadata'
+    mid = ''
+    new_claims: list[dict] = []
+
     def __init__(self, **kwargs: Any):
         super().__init__(**kwargs)
 
@@ -38,10 +42,7 @@ class BaseBot(ExistingPageBot):
         self.commons.login()
 
         self.user_agent = f"{self.commons.username()} / Wikimedia Commons"
-
-        self.mid: str = ''
         self.existing_claims: ClaimCollection = ClaimCollection(repo=self.commons)
-        self.new_claims: list[dict] = []
 
     def treat_page(self) -> None:
         self.mid = f'M{self.current_page.pageid}'
@@ -72,7 +73,7 @@ class BaseBot(ExistingPageBot):
 
         self.new_claims.append(claim.toJSON())
 
-    def save(self, summary: str) -> None:
+    def save(self) -> None:
         if not self.new_claims:
             info("No claims to set")
             return
@@ -82,7 +83,7 @@ class BaseBot(ExistingPageBot):
             "id": self.mid,
             "data": json.dumps({"claims": self.new_claims}),
             "token": self.commons.get_tokens("csrf")['csrf'],
-            "summary": summary,
+            "summary": self.summary,
             "tags": "BotSDC",
             "bot": True,
         }
