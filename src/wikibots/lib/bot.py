@@ -4,7 +4,6 @@ from pprint import pprint
 from time import perf_counter
 from typing import Any
 
-import pywikibot
 from deepdiff import DeepDiff
 from pywikibot import Site, info, critical, Claim, ItemPage
 from pywikibot.bot import ExistingPageBot
