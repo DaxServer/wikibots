@@ -60,7 +60,7 @@ class FlickrBot(BaseBot):
         flickr_review = list(filter(lambda t: t.name == 'FlickreviewR', wikitext.filter_templates()))
 
         if len(flickr_review) != 1:
-            warning('Skipping as it does not have a valid FlickreviewR template')
+            warning('Skipping as it might not have a valid FlickreviewR template')
             self.redis.set(redis_key, 1)
             return None
 
@@ -71,10 +71,16 @@ class FlickrBot(BaseBot):
             self.redis.set(redis_key, 1)
             return None
 
-        flickr_url = str(flickr_url[0].value)
+        flickr_url = str(flickr_url[0].value).strip()
         info(flickr_url)
 
-        flickr_id = parse_flickr_url(flickr_url)
+        try:
+            flickr_id = parse_flickr_url(flickr_url)
+        except Exception as e:
+            error(f'Failed to parse Flickr URL: {e}')
+            self.redis.set(redis_key, 1)
+            return None
+
         info(flickr_id)
 
         if flickr_id.get('type') != 'single_photo':
