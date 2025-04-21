@@ -51,7 +51,6 @@ class BaseBot(ExistingPageBot):
         self.existing_claims: ClaimCollection = ClaimCollection(repo=self.commons)
 
     def skip_page(self, page: pywikibot.page.BasePage) -> bool:
-        pprint(self.redis_prefix)
         return self.redis.exists(f'{self.redis_prefix}:commons:M{page.pageid}')
 
     def treat_page(self) -> None:
