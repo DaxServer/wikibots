@@ -19,6 +19,30 @@ except:
     from .lib.wikidata import WikidataEntity, WikidataProperty
 
 
+class YouTubeChannel:
+    Handle: str | None
+    Id: str
+    Title: str
+
+    def __init__(self, channel_id: str, title: str, handle: str | None):
+        self.Handle = handle
+        self.Id = channel_id
+        self.Title = title
+
+
+class YouTubeVideo:
+    Channel: YouTubeChannel
+    Id: str
+    PublishedAt: str
+    Title: str
+
+    def __init__(self, video_id: str, channel: YouTubeChannel, published_at: str, title: str):
+        self.Channel = channel
+        self.Id = video_id
+        self.PublishedAt = published_at
+        self.Title = title
+
+
 class YouTubeBot(BaseBot):
     redis_prefix = 'Rb7S5jwVOrdIQ6OI9Uu0clfTqAAwH3ayhEKbTtd3ESA='
     summary = 'add [[Commons:Structured data|SDC]] based on metadata from YouTube'
@@ -52,7 +76,6 @@ class YouTubeBot(BaseBot):
         super().treat_page()
 
         youtube_id = self._parse_youtube_id()
-
         if not youtube_id:
             return
 
@@ -64,8 +87,8 @@ class YouTubeBot(BaseBot):
             self.save()
             return
 
-        self.create_published_in_claim(video_data['published_at'])
-        self.create_creator_claim(video_data['video_title'], video_data['channel_handle'], video_data['channel_id'])
+        self.create_published_in_claim(video_data.PublishedAt)
+        self.create_creator_claim(video_data.Channel)
         self.create_source_claim(f'https://www.youtube.com/watch?v={youtube_id}', WikidataEntity.YouTube)
 
         self.save()
@@ -90,13 +113,13 @@ class YouTubeBot(BaseBot):
 
         return youtube_id
 
-    def _fetch_youtube_data(self, youtube_id: str) -> dict | None:
+    def _fetch_youtube_data(self, youtube_id: str) -> YouTubeVideo | None:
         """
         Fetches video details from the YouTube API
 
         :param str youtube_id: The ID of the YouTube video to fetch
         :return: A dictionary containing video details, or None if the video is not found
-        :rtype: dict or None
+        :rtype: YouTubeVideo | None
         """
         try:
             video = self.youtube.videos().list(part="snippet", id=youtube_id).execute()
@@ -121,17 +144,13 @@ class YouTubeBot(BaseBot):
         info(f'Channel title: {channel_title}')
 
         channel = self.youtube.channels().list(part="snippet", id=channel_id).execute()
-        channel_handle = channel['items'][0]['snippet']['customUrl'].lstrip('@') if channel['pageInfo'][
-                                                                                        'totalResults'] == 1 else None
+        channel_handle = channel['items'][0]['snippet']['customUrl'].lstrip('@') if channel['pageInfo']['totalResults'] == 1 else None
         info(f'Channel handle: {channel_handle}')
 
-        return {
-            'video_title': video_title,
-            'published_at': published_at,
-            'channel_id': channel_id,
-            'channel_title': channel_title,
-            'channel_handle': channel_handle,
-        }
+        ytc = YouTubeChannel(channel_id=channel_id, title=channel_title, handle=channel_handle)
+        yt = YouTubeVideo(video_id=youtube_id, channel=ytc, published_at=published_at, title=video_title)
+
+        return yt
 
     def create_youtube_video_id_claim(self, video_id: str) -> None:
         """
@@ -181,7 +200,7 @@ class YouTubeBot(BaseBot):
 
         self.new_claims.append(claim.toJSON())
 
-    def create_creator_claim(self, channel_title: str, channel_handle: str | None, channel_id: str) -> None:
+    def create_creator_claim(self, channel: YouTubeChannel) -> None:
         """
         Creates a creator claim with channel information.
         
@@ -189,10 +208,8 @@ class YouTubeBot(BaseBot):
         channel title, handle (if provided), and channel ID, then appends the serialized claim 
         to the list of new claims.
 
-        :param str channel_title: The title of the YouTube channel
-        :param channel_handle: The handle of the YouTube channel (if available)
-        :type channel_handle: str or None
-        :param str channel_id: The unique YouTube channel identifier
+        :param channel: The YouTubeChannel object containing channel details
+        :type channel: YouTubeChannel
         :rtype: None
         """
         if WikidataProperty.Creator in self.existing_claims:
@@ -201,17 +218,17 @@ class YouTubeBot(BaseBot):
         claim = Claim(self.commons, WikidataProperty.Creator)
         claim.setSnakType('somevalue')
 
-        # author_name_string_qualifier = Claim(self.commons, WikidataProperty.AuthorNameString)
-        # author_name_string_qualifier.setTarget(channel_title)
-        # claim.addQualifier(author_name_string_qualifier)
+        author_name_string_qualifier = Claim(self.commons, WikidataProperty.AuthorNameString)
+        author_name_string_qualifier.setTarget(channel.Title)
+        claim.addQualifier(author_name_string_qualifier)
 
-        if channel_handle is not None:
+        if channel.Handle is not None:
             youtube_handle_qualifier = Claim(self.commons, WikidataProperty.YouTubeHandle)
-            youtube_handle_qualifier.setTarget(channel_handle)
+            youtube_handle_qualifier.setTarget(channel.Handle)
             claim.addQualifier(youtube_handle_qualifier)
 
         youtube_channel_id_qualifier = Claim(self.commons, WikidataProperty.YouTubeChannelId)
-        youtube_channel_id_qualifier.setTarget(channel_id)
+        youtube_channel_id_qualifier.setTarget(channel.Id)
         claim.addQualifier(youtube_channel_id_qualifier)
 
         self.new_claims.append(claim.toJSON())
