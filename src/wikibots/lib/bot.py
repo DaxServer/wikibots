@@ -8,6 +8,7 @@ from deepdiff import DeepDiff
 from pywikibot import Site, info, critical, Claim, ItemPage
 from pywikibot.bot import ExistingPageBot
 from pywikibot.data.api import Request
+from pywikibot.page import BasePage
 from pywikibot.page._collections import ClaimCollection
 from pywikibot.scripts.wrapper import pwb
 from redis import Redis
@@ -49,7 +50,7 @@ class BaseBot(ExistingPageBot):
         self.new_claims: list[dict] = []
         self.existing_claims: ClaimCollection = ClaimCollection(repo=self.commons)
 
-    def skip_page(self, page: pywikibot.page.BasePage) -> bool:
+    def skip_page(self, page: BasePage) -> bool:
         return self.redis.exists(f'{self.redis_prefix}:commons:M{page.pageid}')
 
     def treat_page(self) -> None:
