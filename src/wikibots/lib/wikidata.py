@@ -3,6 +3,7 @@ class WikidataEntity:
     Copyrighted = "Q50423863"
     DedicatedToPublicDomainByCopyrightOwner = "Q88088423"
     FileAvailableOnInternet = "Q74228490"
+    Flickr = "Q103204"
     PublicDomain = "Q19652"
     StatedByCopyrightHolderAtSourceWebsite = "Q61045577"
     USACE = 'Q1049334'
@@ -12,12 +13,15 @@ class WikidataEntity:
 
 class WikidataProperty:
     AppliesToJurisdiction = "P1001"
-    AuthorNameString = "P2093"
+    AuthorName = "P2093"
+    CoordinatesOfThePointOfView = "P1259"
     CopyrightLicense = "P275"
     CopyrightStatus = "P6216"
     Creator = "P170"
     DescribedAtUrl = "P973"
     DeterminationMethod = "P459"
+    FlickrPhotoId = "P12120"
+    FlickrUserId = "P3267"
     Inception = "P571"
     Operator = "P137"
     PublicationDate = "P577"

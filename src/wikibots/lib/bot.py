@@ -7,6 +7,7 @@ from typing import Any
 from deepdiff import DeepDiff
 from pywikibot import Site, info, critical, Claim, ItemPage
 from pywikibot.bot import ExistingPageBot
+from pywikibot.data.api import Request
 from pywikibot.page._collections import ClaimCollection
 from pywikibot.scripts.wrapper import pwb
 
@@ -17,6 +18,8 @@ except:
 
 
 class BaseBot(ExistingPageBot):
+    summary = 'add [[Commons:Structured data|SDC]] based on metadata'
+
     def __init__(self, **kwargs: Any):
         super().__init__(**kwargs)
 
@@ -37,11 +40,26 @@ class BaseBot(ExistingPageBot):
         self.commons.login()
 
         self.user_agent = f"{self.commons.username()} / Wikimedia Commons"
-
-        self.existing_claims: ClaimCollection = ClaimCollection(repo=self.commons)
+        self.mid = ''
         self.new_claims: list[dict] = []
+        self.existing_claims: ClaimCollection = ClaimCollection(repo=self.commons)
+
+    def treat_page(self) -> None:
+        self.mid = f'M{self.current_page.pageid}'
+        info(self.current_page.full_url())
+        info(self.mid)
+
+    def fetch_claims(self) -> None:
+        request: Request = self.commons.simple_request(action="wbgetentities", ids=self.mid)
+        statements = request.submit().get('entities').get(self.mid).get('statements', [])
+
+        self.new_claims = []
+        self.existing_claims = ClaimCollection.fromJSON(data=statements, repo=self.commons)
 
     def create_source_claim(self, source: str, operator: str) -> None:
+        if WikidataProperty.SourceOfFile in self.existing_claims:
+            return
+
         claim = Claim(self.commons, WikidataProperty.SourceOfFile)
         claim.setTarget(ItemPage(self.wikidata, WikidataEntity.FileAvailableOnInternet))
 
@@ -55,19 +73,17 @@ class BaseBot(ExistingPageBot):
 
         self.new_claims.append(claim.toJSON())
 
-    def save(self, summary: str) -> None:
+    def save(self) -> None:
         if not self.new_claims:
             info("No claims to set")
             return
 
-        mid = f'M{self.current_page.pageid}'
-
         payload = {
             "action": "wbeditentity",
-            "id": mid,
+            "id": self.mid,
             "data": json.dumps({"claims": self.new_claims}),
             "token": self.commons.get_tokens("csrf")['csrf'],
-            "summary": summary,
+            "summary": self.summary,
             "tags": "BotSDC",
             "bot": True,
         }
@@ -78,6 +94,9 @@ class BaseBot(ExistingPageBot):
         try:
             start = perf_counter()
             request.submit()
-            info(f"Updating {mid} took {(perf_counter() - start):.1f} s")
+            info(f"Updating {self.mid} took {(perf_counter() - start):.1f} s")
         except Exception as e:
             critical(f"Failed to update: {e}")
+
+        self.mid = ''
+        self.new_claims = []
