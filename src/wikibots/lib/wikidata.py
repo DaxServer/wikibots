@@ -13,7 +13,7 @@ class WikidataEntity:
 
 class WikidataProperty:
     AppliesToJurisdiction = "P1001"
-    AuthorName = "P2093"
+    AuthorNameString = "P2093"
     CoordinatesOfThePointOfView = "P1259"
     CopyrightLicense = "P275"
     CopyrightStatus = "P6216"
