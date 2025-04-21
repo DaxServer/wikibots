@@ -130,7 +130,7 @@ class FlickrBot(BaseBot):
         claim.setSnakType('somevalue')
 
         author_name = (user["realname"] or user["username"]).strip()
-        author_qualifier = Claim(self.commons, WikidataProperty.AuthorName)
+        author_qualifier = Claim(self.commons, WikidataProperty.AuthorNameString)
         author_qualifier.setTarget(author_name)
         claim.addQualifier(author_qualifier)
 

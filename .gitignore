@@ -1,7 +1,7 @@
 __pycache__
 apicache
-logs
 
 pywikibot-*.lwp
 throttle.ctrl
 user-password.py
+*.sh

@@ -11,9 +11,10 @@ dependencies = [
     "python-dateutil (>=2.9.0.post0,<3.0.0)",
     "deepdiff (>=8.4.2,<9.0.0)",
     "requests-oauthlib (>=2.0.0,<3.0.0)",
-    "redis (>=5.2.1,<6.0.0)",
-    "flickr-url-parser (>=1.11.0,<2.0.0)",
+    "google-api-python-client (>=2.166.0,<3.0.0)",
     "flickr-photos-api (>=2.18.0,<3.0.0)",
+    "flickr-url-parser (>=1.11.0,<2.0.0)",
+    "redis (>=5.2.1,<6.0.0)",
 ]
 
 [tool.poetry]
@@ -22,6 +23,7 @@ packages = [{include = "wikibots", from = "src"}]
 [tool.poetry.scripts]
 flickr = "wikibots.flickr:main"
 usace = "wikibots.usace:main"
+youtube = "wikibots.youtube:main"
 
 [build-system]
 requires = ["poetry-core>=2.0.0,<3.0.0"]

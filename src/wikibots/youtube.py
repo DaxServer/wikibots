@@ -1,0 +1,250 @@
+import os
+import sys
+from pprint import pprint
+from typing import Any
+
+import googleapiclient.discovery
+import googleapiclient.errors
+import mwparserfromhell
+from dateutil.parser import isoparse
+from pywikibot import Claim, ItemPage, info, Timestamp, WbTime, warning
+from pywikibot.pagegenerators import SearchPageGenerator
+from redis import Redis
+
+try:
+    sys.path.append(os.path.dirname(os.path.abspath(__file__)) + '/lib')
+    from lib.bot import BaseBot
+    from lib.wikidata import WikidataEntity, WikidataProperty
+except:
+    from .lib.bot import BaseBot
+    from .lib.wikidata import WikidataEntity, WikidataProperty
+
+
+class YouTubeBot(BaseBot):
+    redis_prefix = 'Rb7S5jwVOrdIQ6OI9Uu0clfTqAAwH3ayhEKbTtd3ESA='
+    summary = 'add [[Commons:Structured data|SDC]] based on metadata from YouTube'
+
+    def __init__(self, **kwargs: Any):
+        """
+        Initializes the YouTubeBot instance.
+        
+        Passes any keyword arguments to the base class initializer and configures key components:
+          - A search generator to locate Commons files using the "YouTubeReview" template that lack a YouTube video ID.
+          - A YouTube API client built with the API key from the environment.
+          - A language detector constructed from all available languages.
+        """
+        super().__init__(**kwargs)
+
+        self.generator = SearchPageGenerator(f'file: deepcat:"License reviewed by YouTubeReviewBot" filemime:video hastemplate:"YouTubeReview" -haswbstatement:{WikidataProperty.YouTubeVideoId}', site=self.commons)
+
+        self.youtube = googleapiclient.discovery.build('youtube', 'v3', developerKey=os.getenv('YOUTUBE_API_KEY'))
+        self.redis = Redis(host='redis.svc.tools.eqiad1.wikimedia.cloud', db=9)
+
+    def treat_page(self) -> None:
+        """
+        Processes the page to extract YouTube metadata and update Wikidata claims.
+        
+        Parses the current page's wikitext to retrieve the YouTube video ID from a 
+        "YouTubeReview" template, then uses the YouTube API to fetch video details such as 
+        the title, publication date, and channel information. If valid video data is found, 
+        it creates or updates claims for the video ID, publication date, creator details, 
+        source URL, and copyright license. If the video is not found, the method exits 
+        without making changes. Finally, it saves the updates with a descriptive edit summary.
+        """
+        super().treat_page()
+
+        youtube_id = self._parse_youtube_id()
+
+        if not youtube_id:
+            return
+
+        self.fetch_claims()
+        self.create_youtube_video_id_claim(youtube_id)
+
+        video_data = self._fetch_youtube_data(youtube_id)
+        if video_data is None:
+            self.save()
+            return
+
+        self.create_published_in_claim(video_data['published_at'])
+        self.create_creator_claim(video_data['video_title'], video_data['channel_handle'], video_data['channel_id'])
+        self.create_source_claim(f'https://www.youtube.com/watch?v={youtube_id}', WikidataEntity.YouTube)
+
+        self.save()
+
+    def _parse_youtube_id(self) -> str | None:
+        redis_key = f'{self.redis_prefix}:commons:{self.mid}'
+        wikitext = mwparserfromhell.parse(self.current_page.text)
+
+        youtube_templates = [w for w in wikitext.filter_templates() if w.name == 'YouTubeReview']
+        if not youtube_templates:
+            warning("No YouTubeReview template found")
+            self.redis.set(redis_key, 1)
+            return None
+
+        template = youtube_templates[0]
+        if not template.has('id'):
+            warning("YouTubeReview template is missing the id parameter")
+            self.redis.set(redis_key, 1)
+            return None
+
+        youtube_id = str(template.get('id').value).strip()
+        info(f'Video ID: {youtube_id}')
+
+        return youtube_id
+
+    def _fetch_youtube_data(self, youtube_id: str) -> dict | None:
+        """
+        Fetches video details from the YouTube API
+
+        :param str youtube_id: The ID of the YouTube video to fetch
+        :return: A dictionary containing video details, or None if the video is not found
+        :rtype: dict or None
+        """
+        try:
+            video = self.youtube.videos().list(part="snippet", id=youtube_id).execute()
+        except googleapiclient.errors.HttpError as e:
+            warning(f"Error fetching video data: {str(e)}")
+            return None
+
+        if video['pageInfo']['totalResults'] == 0:
+            warning(f"No video found with ID {youtube_id}")
+            return None
+
+        video_title = video['items'][0]['snippet']['localized']['title']
+        info(f'Video title: {video_title}')
+
+        published_at = video['items'][0]['snippet']['publishedAt']
+        info(published_at)
+
+        channel_id = video['items'][0]['snippet']['channelId']
+        info(f'Channel ID: {channel_id}')
+
+        channel_title = video['items'][0]['snippet']['channelTitle']
+        info(f'Channel title: {channel_title}')
+
+        channel = self.youtube.channels().list(part="snippet", id=channel_id).execute()
+        channel_handle = channel['items'][0]['snippet']['customUrl'].lstrip('@') if channel['pageInfo'][
+                                                                                        'totalResults'] == 1 else None
+        info(f'Channel handle: {channel_handle}')
+
+        return {
+            'video_title': video_title,
+            'published_at': published_at,
+            'channel_id': channel_id,
+            'channel_title': channel_title,
+            'channel_handle': channel_handle,
+        }
+
+    def create_youtube_video_id_claim(self, video_id: str) -> None:
+        """
+        Creates a YouTube video ID claim if one is not already present.
+        
+        If no claim for the YouTube video ID exists, this method creates a new claim using
+        the provided videoId and appends its JSON representation to the list of new claims
+
+        :param str video_id: The ID of the YouTube video to claim
+        :rtype: None
+        """
+        if WikidataProperty.YouTubeVideoId in self.existing_claims:
+            return
+
+        claim = Claim(self.commons, WikidataProperty.YouTubeVideoId)
+        claim.setTarget(video_id)
+
+        self.new_claims.append(claim.toJSON())
+
+    def create_published_in_claim(self, date: str) -> None:
+        """
+        Creates a published-in claim with a publication date qualifier.
+        
+        If a PublishedIn claim already exists, no claim is created. Otherwise, this
+        method constructs a new claim linking the video to YouTube and adds a qualifier
+        for the publication date (normalized to day precision from the provided ISO date
+        string). The new claim is then added in JSON format to the list of pending claims.
+
+        :param str date: The video's publication date in ISO format
+        :rtype: None
+        """
+        if WikidataProperty.PublishedIn in self.existing_claims:
+            return
+
+        claim = Claim(self.commons, WikidataProperty.PublishedIn)
+        claim.setTarget(ItemPage(self.wikidata, WikidataEntity.YouTube))
+
+        wb_ts = WbTime.fromTimestamp(
+            Timestamp.fromISOformat(isoparse(date).replace(hour=0, minute=0, second=0).isoformat()),
+            WbTime.PRECISION['day'],
+        )
+        pprint(wb_ts)
+
+        published_date_qualifier = Claim(self.commons, WikidataProperty.PublicationDate)
+        published_date_qualifier.setTarget(wb_ts)
+        claim.addQualifier(published_date_qualifier)
+
+        self.new_claims.append(claim.toJSON())
+
+    def create_creator_claim(self, channel_title: str, channel_handle: str | None, channel_id: str) -> None:
+        """
+        Creates a creator claim with channel information.
+        
+        If no creator claim exists, constructs a new claim that includes qualifiers for the 
+        channel title, handle (if provided), and channel ID, then appends the serialized claim 
+        to the list of new claims.
+
+        :param str channel_title: The title of the YouTube channel
+        :param channel_handle: The handle of the YouTube channel (if available)
+        :type channel_handle: str or None
+        :param str channel_id: The unique YouTube channel identifier
+        :rtype: None
+        """
+        if WikidataProperty.Creator in self.existing_claims:
+            return
+
+        claim = Claim(self.commons, WikidataProperty.Creator)
+        claim.setSnakType('somevalue')
+
+        author_name_string_qualifier = Claim(self.commons, WikidataProperty.AuthorNameString)
+        author_name_string_qualifier.setTarget(channel_title)
+        claim.addQualifier(author_name_string_qualifier)
+
+        if channel_handle is not None:
+            youtube_handle_qualifier = Claim(self.commons, WikidataProperty.YouTubeHandle)
+            youtube_handle_qualifier.setTarget(channel_handle)
+            claim.addQualifier(youtube_handle_qualifier)
+
+        youtube_channel_id_qualifier = Claim(self.commons, WikidataProperty.YouTubeChannelId)
+        youtube_channel_id_qualifier.setTarget(channel_id)
+        claim.addQualifier(youtube_channel_id_qualifier)
+
+        self.new_claims.append(claim.toJSON())
+
+    def create_source_claim(self, source: str, operator: str) -> None:
+        """
+        Creates a YouTube source claim if one does not already exist.
+        
+        If no source claim has been recorded, this method delegates claim creation to the
+        parent class, linking the file to YouTube using the provided source identifier.
+        
+        :param str source: A string representing the source identifier used in the claim
+        :param str operator: A string representing the operator of the claim
+        :rtype: None
+        """
+        if WikidataProperty.SourceOfFile in self.existing_claims:
+            return
+
+        super().create_source_claim(source, operator)
+
+
+def main():
+    """
+    Entrypoint for running the YouTube bot.
+    
+    Instantiates the YouTubeBot and initiates its execution, starting the process of
+    retrieving video metadata and updating corresponding Wikidata claims.
+    """
+    YouTubeBot().run()
+
+
+if __name__ == "__main__":
+    main()
