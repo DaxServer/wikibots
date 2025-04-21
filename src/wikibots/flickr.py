@@ -12,7 +12,6 @@ from flickr_url_parser import parse_flickr_url
 from mwparserfromhell.wikicode import Wikicode
 from pywikibot import Claim, info, warning, error, Coordinate, WbTime, Timestamp, ItemPage
 from pywikibot.pagegenerators import SearchPageGenerator
-from redis import Redis
 
 try:
     sys.path.append(os.path.dirname(os.path.abspath(__file__)) + '/lib')
@@ -33,7 +32,6 @@ class FlickrBot(BaseBot):
         self.generator = SearchPageGenerator(f'file: incategory:"Flickr images reviewed by FlickreviewR 2" -haswbstatement:{WikidataProperty.FlickrPhotoId} hastemplate:"FlickreviewR"', site=self.commons)
 
         self.flickr_api = FlickrApi.with_api_key(api_key=os.getenv("FLICKR_API_KEY"), user_agent=self.user_agent)
-        self.redis = Redis(host='redis.svc.tools.eqiad1.wikimedia.cloud', db=9)
 
     def treat_page(self) -> None:
         super().treat_page()
@@ -54,21 +52,19 @@ class FlickrBot(BaseBot):
         self.save()
 
     def extract_flickr_data(self) -> SinglePhoto | None:
-        redis_key = f'{self.redis_prefix}:commons:{self.mid}'
-
         wikitext: Wikicode = mwparserfromhell.parse(self.current_page.text)
         flickr_review = list(filter(lambda t: t.name == 'FlickreviewR', wikitext.filter_templates()))
 
         if len(flickr_review) != 1:
             warning('Skipping as it might not have a valid FlickreviewR template')
-            self.redis.set(redis_key, 1)
+            self.redis.set(self.main_redis_key, 1)
             return None
 
         flickr_url = list(filter(lambda p: p.name == 'sourceurl', flickr_review[0].params))
 
         if len(flickr_url) != 1:
             warning('Skipping as FlickreviewR does not have a valid sourceurl parameter')
-            self.redis.set(redis_key, 1)
+            self.redis.set(self.main_redis_key, 1)
             return None
 
         flickr_url = str(flickr_url[0].value).strip()
@@ -78,22 +74,21 @@ class FlickrBot(BaseBot):
             flickr_id = parse_flickr_url(flickr_url)
         except Exception as e:
             error(f'Failed to parse Flickr URL: {e}')
-            self.redis.set(redis_key, 1)
+            self.redis.set(self.main_redis_key, 1)
             return None
 
         info(flickr_id)
 
         if flickr_id.get('type') != 'single_photo':
-            warning('Skipping as it is not a single photo in Flickr')
-            self.redis.set(redis_key, 1)
+            error('Skipping as it is not a single photo in Flickr')
+            info(flickr_id)
+            self.redis.set(self.main_redis_key, 1)
             return None
 
         flickr_photo = self.get_flickr_photo(flickr_id['photo_id'])
 
         if flickr_photo is None:
             self.create_id_claim(flickr_id['photo_id'])
-            self.redis.set(redis_key, 1)
-            return None
 
         return flickr_photo
 

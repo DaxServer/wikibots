@@ -4,12 +4,14 @@ from pprint import pprint
 from time import perf_counter
 from typing import Any
 
+import pywikibot
 from deepdiff import DeepDiff
 from pywikibot import Site, info, critical, Claim, ItemPage
 from pywikibot.bot import ExistingPageBot
 from pywikibot.data.api import Request
 from pywikibot.page._collections import ClaimCollection
 from pywikibot.scripts.wrapper import pwb
+from redis import Redis
 
 try:
     from wikidata import WikidataEntity, WikidataProperty
@@ -19,6 +21,8 @@ except:
 
 class BaseBot(ExistingPageBot):
     summary = 'add [[Commons:Structured data|SDC]] based on metadata'
+    redis_prefix = ''
+    main_redis_key = ''
 
     def __init__(self, **kwargs: Any):
         super().__init__(**kwargs)
@@ -39,15 +43,23 @@ class BaseBot(ExistingPageBot):
         self.commons = Site("commons", "commons", user=os.getenv("PWB_USERNAME"))
         self.commons.login()
 
+        self.redis = Redis(host='redis.svc.tools.eqiad1.wikimedia.cloud', db=9)
+
         self.user_agent = f"{self.commons.username()} / Wikimedia Commons"
         self.mid = ''
         self.new_claims: list[dict] = []
         self.existing_claims: ClaimCollection = ClaimCollection(repo=self.commons)
 
+    def skip_page(self, page: pywikibot.page.BasePage) -> bool:
+        pprint(self.redis_prefix)
+        return self.redis.exists(f'{self.redis_prefix}:commons:M{page.pageid}')
+
     def treat_page(self) -> None:
         self.mid = f'M{self.current_page.pageid}'
         info(self.current_page.full_url())
         info(self.mid)
+
+        self.main_redis_key = f'{self.redis_prefix}:commons:{self.mid}'
 
     def fetch_claims(self) -> None:
         request: Request = self.commons.simple_request(action="wbgetentities", ids=self.mid)
