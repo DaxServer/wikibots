@@ -201,9 +201,9 @@ class YouTubeBot(BaseBot):
         claim = Claim(self.commons, WikidataProperty.Creator)
         claim.setSnakType('somevalue')
 
-        author_name_string_qualifier = Claim(self.commons, WikidataProperty.AuthorNameString)
-        author_name_string_qualifier.setTarget(channel_title)
-        claim.addQualifier(author_name_string_qualifier)
+        # author_name_string_qualifier = Claim(self.commons, WikidataProperty.AuthorNameString)
+        # author_name_string_qualifier.setTarget(channel_title)
+        # claim.addQualifier(author_name_string_qualifier)
 
         if channel_handle is not None:
             youtube_handle_qualifier = Claim(self.commons, WikidataProperty.YouTubeHandle)
