@@ -1,6 +1,6 @@
 import os
 import sys
-from pprint import pprint
+from time import perf_counter
 from typing import Any
 
 import googleapiclient.discovery
@@ -122,7 +122,9 @@ class YouTubeBot(BaseBot):
         :rtype: YouTubeVideo | None
         """
         try:
+            start = perf_counter()
             video = self.youtube.videos().list(part="snippet", id=youtube_id).execute()
+            info(f"Retrieved video data in {(perf_counter() - start) * 1000:.0f} ms")
         except googleapiclient.errors.HttpError as e:
             warning(f"Error fetching video data: {str(e)}")
             return None
@@ -131,21 +133,29 @@ class YouTubeBot(BaseBot):
             warning(f"No video found with ID {youtube_id}")
             return None
 
-        video_title = video['items'][0]['snippet']['localized']['title']
+        video_title = video['items'][0]['snippet']['localized']['title'].strip()
         info(f'Video title: {video_title}')
 
-        published_at = video['items'][0]['snippet']['publishedAt']
+        published_at = video['items'][0]['snippet']['publishedAt'].strip()
         info(published_at)
 
-        channel_id = video['items'][0]['snippet']['channelId']
+        channel_id = video['items'][0]['snippet']['channelId'].strip()
         info(f'Channel ID: {channel_id}')
 
-        channel_title = video['items'][0]['snippet']['channelTitle']
+        channel_title = video['items'][0]['snippet']['channelTitle'].strip()
         info(f'Channel title: {channel_title}')
 
-        channel = self.youtube.channels().list(part="snippet", id=channel_id).execute()
-        channel_handle = channel['items'][0]['snippet']['customUrl'].lstrip('@') if channel['pageInfo']['totalResults'] == 1 else None
-        info(f'Channel handle: {channel_handle}')
+        channel_handle = None
+        try:
+            start = perf_counter()
+            channel = self.youtube.channels().list(part="snippet", id=channel_id).execute()
+            info(f"Retrieved channel data in {(perf_counter() - start) * 1000:.0f} ms")
+
+            if channel['pageInfo']['totalResults'] == 1 and 'customUrl' in channel['items'][0]['snippet']:
+                channel_handle = channel['items'][0]['snippet']['customUrl'].strip().lstrip('@')
+                info(f'Channel handle: {channel_handle}')
+        except googleapiclient.errors.HttpError as e:
+            warning(f"Error fetching channel data: {str(e)}")
 
         ytc = YouTubeChannel(channel_id=channel_id, title=channel_title, handle=channel_handle)
         yt = YouTubeVideo(video_id=youtube_id, channel=ytc, published_at=published_at, title=video_title)
@@ -192,7 +202,6 @@ class YouTubeBot(BaseBot):
             Timestamp.fromISOformat(isoparse(date).replace(hour=0, minute=0, second=0).isoformat()),
             WbTime.PRECISION['day'],
         )
-        pprint(wb_ts)
 
         published_date_qualifier = Claim(self.commons, WikidataProperty.PublicationDate)
         published_date_qualifier.setTarget(wb_ts)
