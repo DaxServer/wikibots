@@ -88,10 +88,10 @@ class YouTubeBot(BaseBot):
             self.redis.set(redis_key, 1)
             return None
 
-        youtube_id = template.get('id').value
+        youtube_id = str(template.get('id').value).strip()
         info(f'Video ID: {youtube_id}')
 
-        return youtube_id.__str__()
+        return youtube_id
 
     def _fetch_youtube_data(self, youtube_id: str) -> dict | None:
         """
@@ -172,7 +172,10 @@ class YouTubeBot(BaseBot):
         claim = Claim(self.commons, WikidataProperty.PublishedIn)
         claim.setTarget(ItemPage(self.wikidata, WikidataEntity.YouTube))
 
-        wb_ts = WbTime.fromTimestamp(Timestamp.fromISOformat(isoparse(date).replace(hour=0, minute=0, second=0).isoformat()), 'day')
+        wb_ts = WbTime.fromTimestamp(
+            Timestamp.fromISOformat(isoparse(date).replace(hour=0, minute=0, second=0).isoformat()),
+            WbTime.PRECISION['day'],
+        )
         pprint(wb_ts)
 
         published_date_qualifier = Claim(self.commons, WikidataProperty.PublicationDate)
