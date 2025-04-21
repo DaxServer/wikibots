@@ -9,7 +9,6 @@ import mwparserfromhell
 from dateutil.parser import isoparse
 from pywikibot import Claim, ItemPage, info, Timestamp, WbTime, warning
 from pywikibot.pagegenerators import SearchPageGenerator
-from redis import Redis
 
 try:
     sys.path.append(os.path.dirname(os.path.abspath(__file__)) + '/lib')
@@ -38,7 +37,6 @@ class YouTubeBot(BaseBot):
         self.generator = SearchPageGenerator(f'file: deepcat:"License reviewed by YouTubeReviewBot" filemime:video hastemplate:"YouTubeReview" -haswbstatement:{WikidataProperty.YouTubeVideoId}', site=self.commons)
 
         self.youtube = googleapiclient.discovery.build('youtube', 'v3', developerKey=os.getenv('YOUTUBE_API_KEY'))
-        self.redis = Redis(host='redis.svc.tools.eqiad1.wikimedia.cloud', db=9)
 
     def treat_page(self) -> None:
         """
@@ -73,19 +71,18 @@ class YouTubeBot(BaseBot):
         self.save()
 
     def _parse_youtube_id(self) -> str | None:
-        redis_key = f'{self.redis_prefix}:commons:{self.mid}'
         wikitext = mwparserfromhell.parse(self.current_page.text)
 
         youtube_templates = [w for w in wikitext.filter_templates() if w.name == 'YouTubeReview']
         if not youtube_templates:
             warning("No YouTubeReview template found")
-            self.redis.set(redis_key, 1)
+            self.redis.set(self.main_redis_key, 1)
             return None
 
         template = youtube_templates[0]
         if not template.has('id'):
             warning("YouTubeReview template is missing the id parameter")
-            self.redis.set(redis_key, 1)
+            self.redis.set(self.main_redis_key, 1)
             return None
 
         youtube_id = str(template.get('id').value).strip()
