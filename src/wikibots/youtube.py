@@ -7,9 +7,9 @@ import googleapiclient.discovery
 import googleapiclient.errors
 import mwparserfromhell
 from dateutil.parser import isoparse
-from pywikibot import Claim, ItemPage, info, Timestamp, WbTime, WbMonolingualText, warning, error
-from pywikibot.page._collections import ClaimCollection
+from pywikibot import Claim, ItemPage, info, Timestamp, WbTime, warning
 from pywikibot.pagegenerators import SearchPageGenerator
+from redis import Redis
 
 try:
     sys.path.append(os.path.dirname(os.path.abspath(__file__)) + '/lib')
@@ -21,6 +21,9 @@ except:
 
 
 class YouTubeBot(BaseBot):
+    redis_prefix = 'Rb7S5jwVOrdIQ6OI9Uu0clfTqAAwH3ayhEKbTtd3ESA='
+    summary = 'add [[Commons:Structured data|SDC]] based on metadata from YouTube'
+
     def __init__(self, **kwargs: Any):
         """
         Initializes the YouTubeBot instance.
@@ -35,6 +38,7 @@ class YouTubeBot(BaseBot):
         self.generator = SearchPageGenerator(f'file: deepcat:"License reviewed by YouTubeReviewBot" filemime:video hastemplate:"YouTubeReview" -haswbstatement:{WikidataProperty.YouTubeVideoId}', site=self.commons)
 
         self.youtube = googleapiclient.discovery.build('youtube', 'v3', developerKey=os.getenv('YOUTUBE_API_KEY'))
+        self.redis = Redis(host='redis.svc.tools.eqiad1.wikimedia.cloud', db=9)
 
     def treat_page(self) -> None:
         """
@@ -47,41 +51,47 @@ class YouTubeBot(BaseBot):
         source URL, and copyright license. If the video is not found, the method exits 
         without making changes. Finally, it saves the updates with a descriptive edit summary.
         """
-        mid = f'M{self.current_page.pageid}'
-        info(self.current_page.full_url())
-        info(mid)
+        super().treat_page()
 
-        wikitext = mwparserfromhell.parse(self.current_page.text)
+        youtube_id = self._parse_youtube_id()
 
-        youtube_templates = [w for w in wikitext.filter_templates() if w.name == 'YouTubeReview']
-        if not youtube_templates:
-            info("No YouTubeReview template found")
+        if not youtube_id:
             return
-        
-        template = youtube_templates[0]
-        if not template.has('id'):
-            info("YouTubeReview template is missing the id parameter")
-            return
-        
-        youtube_id = template.get('id').value
-        pprint(f'Video ID: {youtube_id}')
+
+        self.fetch_claims()
+        self.create_youtube_video_id_claim(youtube_id)
 
         video_data = self._fetch_youtube_data(youtube_id)
         if video_data is None:
+            self.save()
             return
 
-        self.new_claims = []
-        self.existing_claims = ClaimCollection.fromJSON(
-            data=self.commons.simple_request(action="wbgetentities", ids=mid).submit()['entities'][mid]['statements'],
-            repo=self.commons
-        )
-
-        self.create_youtube_video_id_claim(youtube_id.__str__())
         self.create_published_in_claim(video_data['published_at'])
         self.create_creator_claim(video_data['video_title'], video_data['channel_handle'], video_data['channel_id'])
         self.create_source_claim(f'https://www.youtube.com/watch?v={youtube_id}', WikidataEntity.YouTube)
 
-        self.save('add [[Commons:Structured data|SDC]] based on metadata from YouTube. Test run.')
+        self.save()
+
+    def _parse_youtube_id(self) -> str | None:
+        redis_key = f'{self.redis_prefix}:commons:{self.mid}'
+        wikitext = mwparserfromhell.parse(self.current_page.text)
+
+        youtube_templates = [w for w in wikitext.filter_templates() if w.name == 'YouTubeReview']
+        if not youtube_templates:
+            warning("No YouTubeReview template found")
+            self.redis.set(redis_key, 1)
+            return None
+
+        template = youtube_templates[0]
+        if not template.has('id'):
+            warning("YouTubeReview template is missing the id parameter")
+            self.redis.set(redis_key, 1)
+            return None
+
+        youtube_id = template.get('id').value
+        info(f'Video ID: {youtube_id}')
+
+        return youtube_id.__str__()
 
     def _fetch_youtube_data(self, youtube_id: str) -> dict | None:
         """
@@ -94,11 +104,11 @@ class YouTubeBot(BaseBot):
         try:
             video = self.youtube.videos().list(part="snippet", id=youtube_id).execute()
         except googleapiclient.errors.HttpError as e:
-            info(f"Error fetching video data: {str(e)}")
+            warning(f"Error fetching video data: {str(e)}")
             return None
 
         if video['pageInfo']['totalResults'] == 0:
-            info(f"No video found with ID {youtube_id}")
+            warning(f"No video found with ID {youtube_id}")
             return None
 
         video_title = video['items'][0]['snippet']['localized']['title']
