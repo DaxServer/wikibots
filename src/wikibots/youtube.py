@@ -9,7 +9,6 @@ import mwparserfromhell
 from dateutil.parser import isoparse
 from pywikibot import Claim, ItemPage, info, Timestamp, WbTime, warning
 from pywikibot.pagegenerators import SearchPageGenerator
-from pywikibot.scripts.wrapper import pwb
 
 try:
     sys.path.append(os.path.dirname(os.path.abspath(__file__)) + '/lib')
