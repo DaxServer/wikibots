@@ -47,6 +47,9 @@ class YouTubeBot(BaseBot):
     redis_prefix = 'Rb7S5jwVOrdIQ6OI9Uu0clfTqAAwH3ayhEKbTtd3ESA='
     summary = 'add [[Commons:Structured data|SDC]] based on metadata from YouTube'
 
+    # Throttle to 30 seconds to be under YouTube API quota 10k/day
+    throttle = 30
+
     def __init__(self, **kwargs: Any):
         """
         Initializes the YouTubeBot instance.

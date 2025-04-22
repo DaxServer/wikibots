@@ -23,6 +23,7 @@ class BaseBot(ExistingPageBot):
     summary = 'add [[Commons:Structured data|SDC]] based on metadata'
     redis_prefix = ''
     main_redis_key = ''
+    throttle = 10
 
     def __init__(self, **kwargs: Any):
         super().__init__(**kwargs)
@@ -38,6 +39,8 @@ class BaseBot(ExistingPageBot):
             pwb.config.authenticate["commons.wikimedia.org"] = authenticate
         else:
             pwb.config.password_file = "user-password.py"
+
+        pwb.config.put_throttle = self.throttle
 
         self.wikidata = Site("wikidata", "wikidata")
         self.commons = Site("commons", "commons", user=os.getenv("PWB_USERNAME"))
