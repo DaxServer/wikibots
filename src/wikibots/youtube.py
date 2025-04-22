@@ -9,6 +9,7 @@ import mwparserfromhell
 from dateutil.parser import isoparse
 from pywikibot import Claim, ItemPage, info, Timestamp, WbTime, warning
 from pywikibot.pagegenerators import SearchPageGenerator
+from pywikibot.scripts.wrapper import pwb
 
 try:
     sys.path.append(os.path.dirname(os.path.abspath(__file__)) + '/lib')
@@ -57,6 +58,9 @@ class YouTubeBot(BaseBot):
           - A language detector constructed from all available languages.
         """
         super().__init__(**kwargs)
+
+        # Throttle to 30 seconds to be under YouTube API quota 10k/day
+        pwb.config.put_throttle = 30
 
         self.generator = SearchPageGenerator(f'file: deepcat:"License reviewed by YouTubeReviewBot" filemime:video hastemplate:"YouTubeReview" -haswbstatement:{WikidataProperty.YouTubeVideoId}', site=self.commons)
 
