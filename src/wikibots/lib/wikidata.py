@@ -4,6 +4,7 @@ class WikidataEntity:
     DedicatedToPublicDomainByCopyrightOwner = "Q88088423"
     FileAvailableOnInternet = "Q74228490"
     Flickr = "Q103204"
+    iNaturalist = "Q16958215"
     PublicDomain = "Q19652"
     StatedByCopyrightHolderAtSourceWebsite = "Q61045577"
     USACE = 'Q1049334'
@@ -22,6 +23,9 @@ class WikidataProperty:
     DeterminationMethod = "P459"
     FlickrPhotoId = "P12120"
     FlickrUserId = "P3267"
+    INaturalistPhotoId = "P13419"
+    INaturalistObservationId = "P5683"
+    INaturalistUserId = "P12022"
     Inception = "P571"
     Operator = "P137"
     PublicationDate = "P577"
