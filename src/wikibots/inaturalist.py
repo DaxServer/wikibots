@@ -63,9 +63,7 @@ class INaturalistBot(BaseBot):
         self.fetch_claims()
         self.fetch_observation_data()
 
-        try:
-            self.photo
-        except:
+        if not hasattr(self, 'photo'):
             return
 
         self.create_id_claim(WikidataProperty.INaturalistPhotoId, self.photo.id)

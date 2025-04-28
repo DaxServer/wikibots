@@ -88,7 +88,7 @@ class FlickrBot(BaseBot):
         flickr_photo = self.get_flickr_photo(flickr_id['photo_id'])
 
         if flickr_photo is None:
-            self.create_id_claim(flickr_id['photo_id'])
+            self.create_id_claim(WikidataProperty.FlickrPhotoId, flickr_id['photo_id'])
 
         return flickr_photo
 
