@@ -1,28 +1,37 @@
 import os
 import re
+import string
 import sys
 from dataclasses import dataclass
 from typing import Any
 
 import requests
-from pywikibot import warning, info, Claim
+from pywikibot import warning, info, Claim, ItemPage
 from pywikibot.page import BasePage
-from pywikibot.pagegenerators import SearchPageGenerator
+from pywikibot.pagegenerators import SearchPageGenerator, WikidataSPARQLPageGenerator
 
 try:
     sys.path.append(os.path.dirname(os.path.abspath(__file__)) + '/lib')
     from lib.bot import BaseBot
     from lib.wikidata import WikidataEntity, WikidataProperty
-except:
+except ImportError:
     from .lib.bot import BaseBot
     from .lib.wikidata import WikidataEntity, WikidataProperty
+
+
+sparql_query = string.Template(f'''
+SELECT DISTINCT ?item
+WHERE
+{{
+    ?item wdt:{WikidataProperty.INaturalistTaxonId} "$taxa".
+}}
+''')
 
 
 @dataclass
 class User:
     id: str
-    username: str | None = None
-    realname: str | None = None
+    name: str | None = None
 
 
 @dataclass
@@ -30,6 +39,7 @@ class PhotoData:
     id: str
     observation_id: str
     creator: User | None = None
+    depicts: ItemPage | None = None
 
 
 class INaturalistBot(BaseBot):
@@ -41,12 +51,12 @@ class INaturalistBot(BaseBot):
         super().__init__(**kwargs)
 
         self.generator = SearchPageGenerator(f'file: hastemplate:iNaturalist hastemplate:iNaturalistReview -haswbstatement:{WikidataProperty.INaturalistPhotoId}', site=self.commons)
+        self.inaturalist_wd = ItemPage(self.wikidata, WikidataEntity.iNaturalist)
 
     def skip_page(self, page: BasePage) -> bool:
-        redis = self.redis.exists(f'{self.redis_prefix}:commons:M{page.pageid}')
-        touched = self.commons.username() in page.contributors()
+        redis_key = f'{self.redis_prefix}:commons:M{page.pageid}'
 
-        return redis or touched
+        return self.redis.exists(redis_key) or self.commons.username() in page.contributors()
 
     def treat_page(self) -> None:
         super().treat_page()
@@ -68,8 +78,11 @@ class INaturalistBot(BaseBot):
 
         self.create_id_claim(WikidataProperty.INaturalistPhotoId, self.photo.id)
         self.create_id_claim(WikidataProperty.INaturalistObservationId, self.photo.observation_id)
-        self.create_creator_claim_tmp(author_name_string=self.photo.creator.realname)
         self.create_source_claim(f'https://www.inaturalist.org/photos/{self.photo.id}', WikidataEntity.iNaturalist)
+        self.create_depicts_claim(self.photo.depicts)
+
+        if self.photo.creator is not None:
+            self.create_creator_claim_tmp(author_name_string=self.photo.creator.name)
 
         self.save()
 
@@ -111,15 +124,55 @@ class INaturalistBot(BaseBot):
             self.photo.creator = User(id=observation['user']['id'].__str__())
 
             if 'name' in observation['user']:
-                self.photo.creator.realname = observation['user']['name']
+                self.photo.creator.name = observation['user']['name']
 
-            if 'login' in observation['user']:
-                self.photo.creator.username = observation['user']['login']
+            if self.photo.creator.name is None or len(self.photo.creator.name) == 0:
+                self.photo.creator.name = observation['user']['login'] if 'login' in observation['user'] else None
+
+        self.determine_taxa(observation)
+
+    def determine_taxa(self, observation: dict) -> None:
+        if observation['quality_grade'] != 'research':
+            warning(f'Skipping as observation quality grade is not {observation['quality_grade']}')
+            return
+
+        if 'prefers_community_taxon' in observation['preferences'] and observation['preferences']['prefers_community_taxon']:
+            info('Using community taxon')
+            taxa = observation['community_taxon']
+        else:
+            taxa = observation['taxon']
+
+        for taxa_id in reversed(taxa['ancestor_ids']):
+            info(f'Searching Wikidata for taxon with ID {taxa_id}')
+            gen = WikidataSPARQLPageGenerator(sparql_query.substitute(taxa=taxa_id), site=self.wikidata)
+            items = list(gen)
+
+            if len(items) == 0:
+                warning(f'No Wikidata items found for taxa https://www.inaturalist.org/taxa/{taxa_id}')
+                continue
+
+            if len(items) > 1:
+                warning(f'Found multiple Wikidata items for taxa https://www.inaturalist.org/taxa/{taxa_id}: {items}')
+                return
+
+            info(f'Found Wikidata item for taxa https://www.inaturalist.org/taxa/{taxa_id} - {items[0].getID()}')
+
+            self.photo.depicts = items[0]
+            break
 
     def hook_creator_claim(self, claim: Claim) -> None:
+        assert self.photo.creator is not None
+
         inaturalist_user_id_qualifier = Claim(self.commons, WikidataProperty.INaturalistUserId)
         inaturalist_user_id_qualifier.setTarget(self.photo.creator.id)
         claim.addQualifier(inaturalist_user_id_qualifier)
+
+    def hook_depicts_claim(self, claim: Claim) -> None:
+        assert self.photo.depicts is not None
+
+        stated_in_ref = Claim(self.commons, WikidataProperty.StatedIn)
+        stated_in_ref.setTarget(self.inaturalist_wd)
+        claim.addSource(stated_in_ref)
 
 
 def main() -> None:

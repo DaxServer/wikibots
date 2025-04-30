@@ -16,7 +16,7 @@ from redis import Redis
 
 try:
     from wikidata import WikidataEntity, WikidataProperty
-except:
+except ImportError:
     from wikibots.lib.wikidata import WikidataEntity, WikidataProperty
 
 
@@ -119,7 +119,11 @@ class BaseBot(ExistingPageBot):
             url_qualifier.setTarget(url)
             claim.addQualifier(url_qualifier)
 
-        self.hook_creator_claim(claim)
+        try:
+            self.hook_creator_claim(claim)
+        except AssertionError:
+            pass
+
         self.new_claims.append(claim.toJSON())
 
     def hook_creator_claim(self, claim: Claim) -> None:
@@ -141,6 +145,23 @@ class BaseBot(ExistingPageBot):
         claim.addQualifier(operator_qualifier)
 
         self.new_claims.append(claim.toJSON())
+
+    def create_depicts_claim(self, depicts: ItemPage | None) -> None:
+        if WikidataProperty.Depicts in self.existing_claims or depicts is None:
+            return
+
+        claim = Claim(self.commons, WikidataProperty.Depicts)
+        claim.setTarget(depicts)
+
+        try:
+            self.hook_depicts_claim(claim)
+        except AssertionError:
+            pass
+
+        self.new_claims.append(claim.toJSON())
+
+    def hook_depicts_claim(self, claim: Claim) -> None:
+        pass
 
     def save(self) -> None:
         if not self.new_claims:
