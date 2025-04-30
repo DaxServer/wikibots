@@ -1,5 +1,6 @@
 import json
 import os
+from contextlib import suppress
 from pprint import pprint
 from time import perf_counter
 from typing import Any
@@ -119,10 +120,8 @@ class BaseBot(ExistingPageBot):
             url_qualifier.setTarget(url)
             claim.addQualifier(url_qualifier)
 
-        try:
+        with suppress(AssertionError):
             self.hook_creator_claim(claim)
-        except AssertionError:
-            pass
 
         self.new_claims.append(claim.toJSON())
 
@@ -153,10 +152,8 @@ class BaseBot(ExistingPageBot):
         claim = Claim(self.commons, WikidataProperty.Depicts)
         claim.setTarget(depicts)
 
-        try:
+        with suppress(AssertionError):
             self.hook_depicts_claim(claim)
-        except AssertionError:
-            pass
 
         self.new_claims.append(claim.toJSON())
 

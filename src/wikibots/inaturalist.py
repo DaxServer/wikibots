@@ -109,7 +109,7 @@ class INaturalistBot(BaseBot):
             observation = requests.get(f'https://api.inaturalist.org/v1/observations/{observation_id}', headers={
                 'Accept': 'application/json',
                 'User-Agent': self.user_agent,
-            }).json()['results'][0]
+            }, timeout=30).json()['results'][0]
         except Exception as e:
             warning(f'Failed to fetch observation: {e}')
             self.redis.set(self.main_redis_key, 1)
@@ -121,13 +121,10 @@ class INaturalistBot(BaseBot):
             return
 
         if 'user' in observation:
-            self.photo.creator = User(id=observation['user']['id'].__str__())
-
-            if 'name' in observation['user']:
-                self.photo.creator.name = observation['user']['name']
-
-            if self.photo.creator.name is None or len(self.photo.creator.name) == 0:
-                self.photo.creator.name = observation['user']['login'] if 'login' in observation['user'] else None
+            self.photo.creator = User(
+                id=observation['user']['id'].__str__(),
+                name=observation['user'].get('name', None) or observation['user'].get('login', None),
+            )
 
         self.determine_taxa(observation)
 
@@ -161,14 +158,14 @@ class INaturalistBot(BaseBot):
             break
 
     def hook_creator_claim(self, claim: Claim) -> None:
-        assert self.photo.creator is not None
+        assert hasattr(self, 'photo') and self.photo.creator is not None
 
         inaturalist_user_id_qualifier = Claim(self.commons, WikidataProperty.INaturalistUserId)
         inaturalist_user_id_qualifier.setTarget(self.photo.creator.id)
         claim.addQualifier(inaturalist_user_id_qualifier)
 
     def hook_depicts_claim(self, claim: Claim) -> None:
-        assert self.photo.depicts is not None
+        assert hasattr(self, 'photo') and self.photo.depicts is not None
 
         stated_in_ref = Claim(self.commons, WikidataProperty.StatedIn)
         stated_in_ref.setTarget(self.inaturalist_wd)
