@@ -83,7 +83,7 @@ class YouTubeBot(BaseBot):
             return
 
         self.fetch_claims()
-        self.create_youtube_video_id_claim(youtube_id)
+        self.create_id_claim(WikidataProperty.YouTubeVideoId, youtube_id)
 
         video_data = self._fetch_youtube_data(youtube_id)
         if video_data is None:
@@ -144,24 +144,6 @@ class YouTubeBot(BaseBot):
         yt = YouTubeVideo(video_id=youtube_id, channel=ytc, published_at=published_at, title=video_title)
 
         return yt
-
-    def create_youtube_video_id_claim(self, video_id: str) -> None:
-        """
-        Creates a YouTube video ID claim if one is not already present.
-        
-        If no claim for the YouTube video ID exists, this method creates a new claim using
-        the provided videoId and appends its JSON representation to the list of new claims
-
-        :param str video_id: The ID of the YouTube video to claim
-        :rtype: None
-        """
-        if WikidataProperty.YouTubeVideoId in self.existing_claims:
-            return
-
-        claim = Claim(self.commons, WikidataProperty.YouTubeVideoId)
-        claim.setTarget(video_id)
-
-        self.new_claims.append(claim.toJSON())
 
     def create_published_in_claim(self, date: str) -> None:
         """
@@ -224,22 +206,6 @@ class YouTubeBot(BaseBot):
         claim.addQualifier(youtube_channel_id_qualifier)
 
         self.new_claims.append(claim.toJSON())
-
-    def create_source_claim(self, source: str, operator: str) -> None:
-        """
-        Creates a YouTube source claim if one does not already exist.
-        
-        If no source claim has been recorded, this method delegates claim creation to the
-        parent class, linking the file to YouTube using the provided source identifier.
-        
-        :param str source: A string representing the source identifier used in the claim
-        :param str operator: A string representing the operator of the claim
-        :rtype: None
-        """
-        if WikidataProperty.SourceOfFile in self.existing_claims:
-            return
-
-        super().create_source_claim(source, operator)
 
 
 def main():
