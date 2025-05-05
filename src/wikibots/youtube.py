@@ -61,7 +61,7 @@ class YouTubeBot(BaseBot):
         """
         super().__init__(**kwargs)
 
-        self.generator = SearchPageGenerator(f'file: deepcat:"License reviewed by YouTubeReviewBot" filemime:video hastemplate:"YouTubeReview" -haswbstatement:{WikidataProperty.YouTubeVideoId}', site=self.commons)
+        self.generator = SearchPageGenerator(f'file: incategory:"License review needed (video)" filemime:video hastemplate:"YouTube CC-BY" -haswbstatement:{WikidataProperty.YouTubeVideoId}', site=self.commons)
 
         self.youtube = googleapiclient.discovery.build('youtube', 'v3', developerKey=os.getenv('YOUTUBE_API_KEY'))
 
@@ -78,7 +78,7 @@ class YouTubeBot(BaseBot):
         """
         super().treat_page()
 
-        youtube_id = self._parse_youtube_id()
+        youtube_id = self.retrieve_template_data(['From YouTube'], ['1'])
         if not youtube_id:
             return
 
@@ -95,26 +95,6 @@ class YouTubeBot(BaseBot):
         self.create_source_claim(f'https://www.youtube.com/watch?v={youtube_id}', WikidataEntity.YouTube)
 
         self.save()
-
-    def _parse_youtube_id(self) -> str | None:
-        wikitext = mwparserfromhell.parse(self.current_page.text)
-
-        youtube_templates = [w for w in wikitext.filter_templates() if w.name == 'YouTubeReview']
-        if not youtube_templates:
-            warning("No YouTubeReview template found")
-            self.redis.set(self.main_redis_key, 1)
-            return None
-
-        template = youtube_templates[0]
-        if not template.has('id'):
-            warning("YouTubeReview template is missing the id parameter")
-            self.redis.set(self.main_redis_key, 1)
-            return None
-
-        youtube_id = str(template.get('id').value).strip()
-        info(f'Video ID: {youtube_id}')
-
-        return youtube_id
 
     def _fetch_youtube_data(self, youtube_id: str) -> YouTubeVideo | None:
         """
