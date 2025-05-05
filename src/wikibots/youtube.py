@@ -1,13 +1,14 @@
 import os
 import sys
+from dataclasses import dataclass
 from time import perf_counter
 from typing import Any
 
 import googleapiclient.discovery
-import googleapiclient.errors
-import mwparserfromhell
 from dateutil.parser import isoparse
+from googleapiclient.errors import HttpError
 from pywikibot import Claim, ItemPage, info, Timestamp, WbTime, warning
+from pywikibot.page import BasePage
 from pywikibot.pagegenerators import SearchPageGenerator
 
 try:
@@ -19,28 +20,19 @@ except:
     from .lib.wikidata import WikidataEntity, WikidataProperty
 
 
+@dataclass
 class YouTubeChannel:
-    Handle: str | None
-    Id: str
-    Title: str
-
-    def __init__(self, channel_id: str, title: str, handle: str | None):
-        self.Handle = handle
-        self.Id = channel_id
-        self.Title = title
+    id: str
+    title: str
+    handle: str | None = None
 
 
+@dataclass
 class YouTubeVideo:
-    Channel: YouTubeChannel
-    Id: str
-    PublishedAt: str
-    Title: str
-
-    def __init__(self, video_id: str, channel: YouTubeChannel, published_at: str, title: str):
-        self.Channel = channel
-        self.Id = video_id
-        self.PublishedAt = published_at
-        self.Title = title
+    channel: YouTubeChannel
+    id: str
+    published_at: str
+    title: str
 
 
 class YouTubeBot(BaseBot):
