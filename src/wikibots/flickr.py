@@ -5,11 +5,9 @@ import time
 from time import perf_counter
 from typing import Any
 
-import mwparserfromhell
 from flickr_photos_api import FlickrApi, PhotoIsPrivate, ResourceNotFound, SinglePhoto, User, LocationInfo, \
     DateTaken
 from flickr_url_parser import parse_flickr_url
-from mwparserfromhell.wikicode import Wikicode
 from pywikibot import Claim, info, warning, error, Coordinate, WbTime, Timestamp, ItemPage
 from pywikibot.pagegenerators import SearchPageGenerator
 
@@ -52,22 +50,10 @@ class FlickrBot(BaseBot):
         self.save()
 
     def extract_flickr_data(self) -> SinglePhoto | None:
-        wikitext: Wikicode = mwparserfromhell.parse(self.current_page.text)
-        flickr_review = list(filter(lambda t: t.name == 'FlickreviewR', wikitext.filter_templates()))
-
-        if len(flickr_review) != 1:
-            warning('Skipping as it might not have a valid FlickreviewR template')
-            self.redis.set(self.main_redis_key, 1)
+        flickr_url = self.retrieve_template_data(['FlickreviewR'], ['sourceurl'])
+        if flickr_url is None:
             return None
 
-        flickr_url = list(filter(lambda p: p.name == 'sourceurl', flickr_review[0].params))
-
-        if len(flickr_url) != 1:
-            warning('Skipping as FlickreviewR does not have a valid sourceurl parameter')
-            self.redis.set(self.main_redis_key, 1)
-            return None
-
-        flickr_url = str(flickr_url[0].value).strip()
         info(flickr_url)
 
         try:
