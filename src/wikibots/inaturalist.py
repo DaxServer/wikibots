@@ -82,7 +82,7 @@ class INaturalistBot(BaseBot):
         self.create_depicts_claim(self.photo.depicts)
 
         if self.photo.creator is not None:
-            self.create_creator_claim_tmp(author_name_string=self.photo.creator.name)
+            self.create_creator_claim(author_name_string=self.photo.creator.name)
 
         self.save()
 
