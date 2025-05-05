@@ -42,7 +42,7 @@ class FlickrBot(BaseBot):
             self.save()
             return
 
-        self.create_id_claim(flickr_photo['id'])
+        self.create_id_claim(WikidataProperty.FlickrPhotoId, flickr_photo['id'])
         self.create_creator_claim(flickr_photo['owner'])
         self.create_source_claim(flickr_photo['url'], WikidataEntity.Flickr)
         self.create_location_claim(flickr_photo['location'])
@@ -88,7 +88,7 @@ class FlickrBot(BaseBot):
         flickr_photo = self.get_flickr_photo(flickr_id['photo_id'])
 
         if flickr_photo is None:
-            self.create_id_claim(flickr_id['photo_id'])
+            self.create_id_claim(WikidataProperty.FlickrPhotoId, flickr_id['photo_id'])
 
         return flickr_photo
 
@@ -113,15 +113,6 @@ class FlickrBot(BaseBot):
             time.sleep(60)
 
         return single_photo
-
-    def create_id_claim(self, flickr_photo_id: str) -> None:
-        if WikidataProperty.FlickrPhotoId in self.existing_claims:
-            return
-
-        claim = Claim(self.commons, WikidataProperty.FlickrPhotoId)
-        claim.setTarget(flickr_photo_id)
-
-        self.new_claims.append(claim.toJSON())
 
     def create_creator_claim(self, user: User | None) -> None:
         if WikidataProperty.Creator in self.existing_claims or user is None:

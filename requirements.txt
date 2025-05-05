@@ -103,9 +103,9 @@ charset-normalizer==3.4.1 ; python_version >= "3.12" \
 deepdiff==8.4.2 ; python_version >= "3.12" \
     --hash=sha256:5c741c0867ebc7fcb83950ad5ed958369c17f424e14dee32a11c56073f4ee92a \
     --hash=sha256:7e39e5b26f3747c54f9d0e8b9b29daab670c3100166b77cc0185d5793121b099
-flickr-photos-api==2.18.0 ; python_version >= "3.12" \
-    --hash=sha256:420a1fc44e68c6ef8568df6c84144c83325e13ebb4168fd56d1ae1622670c506 \
-    --hash=sha256:c3a376aab930c1374eb82a6f7772c6fc8978b4529c3919c02197c720c1ca5ad6
+flickr-photos-api==2.21.0 ; python_version >= "3.12" \
+    --hash=sha256:0748232a6a6ecb2e19b636aba6f45fa80b9d366baf136dc81e127c833b5fecc9 \
+    --hash=sha256:37008e9c06dd70aa24c5985cde683d8917b9370f656dddc62250fcc3595fa1bb
 flickr-url-parser==1.11.0 ; python_version >= "3.12" \
     --hash=sha256:c69067abe2856ce07327e011771f1bcb53ed14109abf74b2f1c7bcaff5d38cc7 \
     --hash=sha256:fc1a9e29058d01b308440550e6a81065d5f191c0880e7c4e4ba2c990ed947080

@@ -1,11 +1,13 @@
 import json
 import os
+from contextlib import suppress
 from pprint import pprint
 from time import perf_counter
 from typing import Any
 
+import mwparserfromhell
 from deepdiff import DeepDiff
-from pywikibot import Site, info, critical, Claim, ItemPage
+from pywikibot import Site, info, critical, Claim, ItemPage, warning
 from pywikibot.bot import ExistingPageBot
 from pywikibot.data.api import Request
 from pywikibot.page import BasePage
@@ -15,8 +17,8 @@ from redis import Redis
 
 try:
     from wikidata import WikidataEntity, WikidataProperty
-except:
-    from wikibots.lib.wikidata import WikidataProperty
+except ImportError:
+    from wikibots.lib.wikidata import WikidataEntity, WikidataProperty
 
 
 class BaseBot(ExistingPageBot):
@@ -48,7 +50,7 @@ class BaseBot(ExistingPageBot):
 
         self.redis = Redis(host='redis.svc.tools.eqiad1.wikimedia.cloud', db=9)
 
-        self.user_agent = f"{self.commons.username()} / Wikimedia Commons"
+        self.user_agent = f"{self.commons.username()} / Wikimedia Commons / {os.getenv("EMAIL")}"
         self.mid = ''
         self.new_claims: list[dict] = []
         self.existing_claims: ClaimCollection = ClaimCollection(repo=self.commons)
@@ -70,6 +72,62 @@ class BaseBot(ExistingPageBot):
         self.new_claims = []
         self.existing_claims = ClaimCollection.fromJSON(data=statements, repo=self.commons)
 
+    def retrieve_template_data(self, templates: list[str], parameters: list[str]) -> str | None:
+        wikitext = mwparserfromhell.parse(self.current_page.text)
+
+        inaturalist_templates = [w for w in wikitext.filter_templates() if w.name.strip() in templates]
+        if not inaturalist_templates:
+            warning(f'No match template found for {templates}')
+            self.redis.set(self.main_redis_key, 1)
+            return None
+
+        t = inaturalist_templates[0]
+        for param in parameters:
+            if t.has(param):
+                data = str(t.get(param).value).strip()
+                info(f'{t.name} has {param} : {data}')
+
+                return data
+
+        warning(f'{t.name} template is missing parameters: {parameters}')
+        self.redis.set(self.main_redis_key, 1)
+
+        return None
+
+    def create_id_claim(self, property: str, value: str) -> None:
+        if property in self.existing_claims:
+            return
+
+        claim = Claim(self.commons, property)
+        claim.setTarget(value)
+
+        self.new_claims.append(claim.toJSON())
+
+    def create_creator_claim_tmp(self, author_name_string: str | None = None, url: str | None = None) -> None:
+        if WikidataProperty.Creator in self.existing_claims:
+            return
+
+        claim = Claim(self.commons, WikidataProperty.Creator)
+        claim.setSnakType('somevalue')
+
+        if author_name_string is not None:
+            author_qualifier = Claim(self.commons, WikidataProperty.AuthorNameString)
+            author_qualifier.setTarget(author_name_string)
+            claim.addQualifier(author_qualifier)
+
+        if url is not None:
+            url_qualifier = Claim(self.commons, WikidataProperty.Url)
+            url_qualifier.setTarget(url)
+            claim.addQualifier(url_qualifier)
+
+        with suppress(AssertionError):
+            self.hook_creator_claim(claim)
+
+        self.new_claims.append(claim.toJSON())
+
+    def hook_creator_claim(self, claim: Claim) -> None:
+        pass
+
     def create_source_claim(self, source: str, operator: str) -> None:
         if WikidataProperty.SourceOfFile in self.existing_claims:
             return
@@ -86,6 +144,21 @@ class BaseBot(ExistingPageBot):
         claim.addQualifier(operator_qualifier)
 
         self.new_claims.append(claim.toJSON())
+
+    def create_depicts_claim(self, depicts: ItemPage | None) -> None:
+        if WikidataProperty.Depicts in self.existing_claims or depicts is None:
+            return
+
+        claim = Claim(self.commons, WikidataProperty.Depicts)
+        claim.setTarget(depicts)
+
+        with suppress(AssertionError):
+            self.hook_depicts_claim(claim)
+
+        self.new_claims.append(claim.toJSON())
+
+    def hook_depicts_claim(self, claim: Claim) -> None:
+        pass
 
     def save(self) -> None:
         if not self.new_claims:

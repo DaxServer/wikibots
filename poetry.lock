@@ -169,14 +169,14 @@ optimize = ["orjson"]
 
 [[package]]
 name = "flickr-photos-api"
-version = "2.18.0"
+version = "2.21.0"
 description = "Look up information about photos and collections of photos from Flickr"
 optional = false
 python-versions = ">=3.12"
 groups = ["main"]
 files = [
-    {file = "flickr_photos_api-2.18.0-py3-none-any.whl", hash = "sha256:420a1fc44e68c6ef8568df6c84144c83325e13ebb4168fd56d1ae1622670c506"},
-    {file = "flickr_photos_api-2.18.0.tar.gz", hash = "sha256:c3a376aab930c1374eb82a6f7772c6fc8978b4529c3919c02197c720c1ca5ad6"},
+    {file = "flickr_photos_api-2.21.0-py3-none-any.whl", hash = "sha256:0748232a6a6ecb2e19b636aba6f45fa80b9d366baf136dc81e127c833b5fecc9"},
+    {file = "flickr_photos_api-2.21.0.tar.gz", hash = "sha256:37008e9c06dd70aa24c5985cde683d8917b9370f656dddc62250fcc3595fa1bb"},
 ]
 
 [package.dependencies]
