@@ -23,7 +23,6 @@ packages = [{include = "wikibots", from = "src"}]
 [tool.poetry.scripts]
 flickr = "wikibots.flickr:main"
 inaturalist = "wikibots.inaturalist:main"
-usace = "wikibots.usace:main"
 youtube = "wikibots.youtube:main"
 
 [tool.poetry.requires-plugins]

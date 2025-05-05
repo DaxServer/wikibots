@@ -55,7 +55,7 @@ class YouTubeBot(BaseBot):
         Initializes the YouTubeBot instance.
         
         Passes any keyword arguments to the base class initializer and configures key components:
-          - A search generator to locate Commons files using the "YouTubeReview" template that lack a YouTube video ID.
+          - A search generator to locate Commons files that lack a YouTube video ID.
           - A YouTube API client built with the API key from the environment.
           - A language detector constructed from all available languages.
         """
@@ -69,8 +69,8 @@ class YouTubeBot(BaseBot):
         """
         Processes the page to extract YouTube metadata and update Wikidata claims.
         
-        Parses the current page's wikitext to retrieve the YouTube video ID from a 
-        "YouTubeReview" template, then uses the YouTube API to fetch video details such as 
+        Parses the current page's wikitext to retrieve the YouTube video ID from a
+        "YouTube CC-BY" template, then uses the YouTube API to fetch video details such as
         the title, publication date, and channel information. If valid video data is found, 
         it creates or updates claims for the video ID, publication date, creator details, 
         source URL, and copyright license. If the video is not found, the method exits 
