@@ -78,7 +78,7 @@ class YouTubeBot(BaseBot):
         """
         super().treat_page()
 
-        youtube_id = youtube_id = self.retrieve_template_data(['From YouTube'], ['1'])
+        youtube_id = self.retrieve_template_data(['From YouTube'], ['1'])
         if not youtube_id:
             return
 
