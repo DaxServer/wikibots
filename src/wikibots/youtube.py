@@ -8,7 +8,6 @@ import googleapiclient.discovery
 from dateutil.parser import isoparse
 from googleapiclient.errors import HttpError
 from pywikibot import Claim, ItemPage, info, Timestamp, WbTime, warning
-from pywikibot.page import BasePage
 from pywikibot.pagegenerators import SearchPageGenerator
 
 try:
