@@ -171,7 +171,7 @@ class YouTubeBot(BaseBot):
     def hook_creator_claim(self, claim: Claim) -> None:
         assert self.video
 
-        if self.video.channel is not None:
+        if self.video.channel and self.video.channel.handle:
             youtube_handle_qualifier = Claim(self.commons, WikidataProperty.YouTubeHandle)
             youtube_handle_qualifier.setTarget(self.video.channel.handle)
             claim.addQualifier(youtube_handle_qualifier)

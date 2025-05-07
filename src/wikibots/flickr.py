@@ -20,7 +20,7 @@ except:
 
 class FlickrBot(BaseBot):
     redis_prefix = 'xQ6cz5J84Viw/K6FIcOH1kxJjfiS8jO56AoSmhBgO/A='
-    summary = 'add [[Commons:Structured data|SDC]] based on metadata from Flickr. Task #2'
+    summary = 'add [[Commons:Structured data|SDC]] based on metadata from Flickr'
 
     def __init__(self, **kwargs: Any):
         super().__init__(**kwargs)
@@ -38,6 +38,9 @@ class FlickrBot(BaseBot):
         self.fetch_claims()
 
         photo_id = self.extract_flickr_data()
+        if photo_id is None:
+            return
+
         self.get_flickr_photo(photo_id)
 
         if self.photo is None:
@@ -120,7 +123,7 @@ class FlickrBot(BaseBot):
         }
 
         if granularity not in precision_map:
-            error(f'Unrecognised date granularity: {self.photo['date_taken']}')
+            error(f'Unrecognised date granularity: {granularity} in photo {self.photo["date_taken"]}')
             return
 
         precision = precision_map[granularity]

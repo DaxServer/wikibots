@@ -84,7 +84,7 @@ class INaturalistBot(BaseBot):
         self.create_source_claim(f'https://www.inaturalist.org/photos/{self.photo.id}', WikidataEntity.iNaturalist)
         self.create_depicts_claim(self.photo.depicts)
 
-        if self.photo.creator is not None:
+        if self.photo.creator:
             self.create_creator_claim(author_name_string=self.photo.creator.name)
 
         self.save()

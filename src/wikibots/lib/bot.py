@@ -61,7 +61,7 @@ class BaseBot(ExistingPageBot):
 
         self.redis = Redis(host='redis.svc.tools.eqiad1.wikimedia.cloud', db=9)
 
-        self.user_agent = f"{self.commons.username()} / Wikimedia Commons / {os.getenv("EMAIL")}"
+        self.user_agent = f"{self.commons.username()} / Wikimedia Commons / {os.getenv('EMAIL')}"
         self.wiki_properties: WikiProperties | None = None
 
     def skip_page(self, page: BasePage) -> bool:
@@ -111,17 +111,6 @@ class BaseBot(ExistingPageBot):
 
         return None
 
-    def create_id_claim(self, property: str, value: str) -> None:
-        assert self.wiki_properties
-
-        if property in self.wiki_properties.existing_claims:
-            return
-
-        claim = Claim(self.commons, property)
-        claim.setTarget(value)
-
-        self.wiki_properties.new_claims.append(claim)
-
     def create_creator_claim(self, author_name_string: str | None = None, url: str | None = None) -> None:
         assert self.wiki_properties
 
@@ -131,12 +120,12 @@ class BaseBot(ExistingPageBot):
         claim = Claim(self.commons, WikidataProperty.Creator)
         claim.setSnakType('somevalue')
 
-        if author_name_string is not None:
+        if author_name_string:
             author_qualifier = Claim(self.commons, WikidataProperty.AuthorNameString)
             author_qualifier.setTarget(author_name_string)
             claim.addQualifier(author_qualifier)
 
-        if url is not None:
+        if url:
             url_qualifier = Claim(self.commons, WikidataProperty.Url)
             url_qualifier.setTarget(url)
             claim.addQualifier(url_qualifier)
@@ -146,25 +135,28 @@ class BaseBot(ExistingPageBot):
 
         self.wiki_properties.new_claims.append(claim)
 
-    def hook_creator_claim(self, claim: Claim) -> None:
-        pass
-
-    def create_source_claim(self, source: str, operator: str) -> None:
+    def create_depicts_claim(self, depicts: ItemPage | None) -> None:
         assert self.wiki_properties
 
-        if WikidataProperty.SourceOfFile in self.wiki_properties.existing_claims:
+        if WikidataProperty.Depicts in self.wiki_properties.existing_claims or depicts is None:
             return
 
-        claim = Claim(self.commons, WikidataProperty.SourceOfFile)
-        claim.setTarget(ItemPage(self.wikidata, WikidataEntity.FileAvailableOnInternet))
+        claim = Claim(self.commons, WikidataProperty.Depicts)
+        claim.setTarget(depicts)
 
-        described_at_url_qualifier = Claim(self.commons, WikidataProperty.DescribedAtUrl)
-        described_at_url_qualifier.setTarget(source)
-        claim.addQualifier(described_at_url_qualifier)
+        with suppress(AssertionError):
+            self.hook_depicts_claim(claim)
 
-        operator_qualifier = Claim(self.commons, WikidataProperty.Operator)
-        operator_qualifier.setTarget(ItemPage(self.wikidata, operator))
-        claim.addQualifier(operator_qualifier)
+        self.wiki_properties.new_claims.append(claim)
+
+    def create_id_claim(self, property: str, value: str) -> None:
+        assert self.wiki_properties
+
+        if property in self.wiki_properties.existing_claims:
+            return
+
+        claim = Claim(self.commons, property)
+        claim.setTarget(value)
 
         self.wiki_properties.new_claims.append(claim)
 
@@ -201,21 +193,29 @@ class BaseBot(ExistingPageBot):
 
         self.wiki_properties.new_claims.append(claim)
 
-    def create_depicts_claim(self, depicts: ItemPage | None) -> None:
+    def create_source_claim(self, source: str, operator: str) -> None:
         assert self.wiki_properties
 
-        if WikidataProperty.Depicts in self.wiki_properties.existing_claims or depicts is None:
+        if WikidataProperty.SourceOfFile in self.wiki_properties.existing_claims:
             return
 
-        claim = Claim(self.commons, WikidataProperty.Depicts)
-        claim.setTarget(depicts)
+        claim = Claim(self.commons, WikidataProperty.SourceOfFile)
+        claim.setTarget(ItemPage(self.wikidata, WikidataEntity.FileAvailableOnInternet))
 
-        with suppress(AssertionError):
-            self.hook_depicts_claim(claim)
+        described_at_url_qualifier = Claim(self.commons, WikidataProperty.DescribedAtUrl)
+        described_at_url_qualifier.setTarget(source)
+        claim.addQualifier(described_at_url_qualifier)
+
+        operator_qualifier = Claim(self.commons, WikidataProperty.Operator)
+        operator_qualifier.setTarget(ItemPage(self.wikidata, operator))
+        claim.addQualifier(operator_qualifier)
 
         self.wiki_properties.new_claims.append(claim)
 
     def hook_depicts_claim(self, claim: Claim) -> None:
+        pass
+
+    def hook_creator_claim(self, claim: Claim) -> None:
         pass
 
     def save(self) -> None:
