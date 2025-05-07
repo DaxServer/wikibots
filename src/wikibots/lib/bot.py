@@ -103,7 +103,7 @@ class BaseBot(ExistingPageBot):
 
         self.new_claims.append(claim.toJSON())
 
-    def create_creator_claim_tmp(self, author_name_string: str | None = None, url: str | None = None) -> None:
+    def create_creator_claim(self, author_name_string: str | None = None, url: str | None = None) -> None:
         if WikidataProperty.Creator in self.existing_claims:
             return
 
