@@ -68,6 +68,9 @@ class YouTubeBot(BaseBot):
         source URL, and copyright license. If the video is not found, the method exits 
         without making changes. Finally, it saves the updates with a descriptive edit summary.
         """
+        # Reset
+        self.video = None
+
         super().treat_page()
 
         youtube_id = self.retrieve_template_data(['From YouTube'], ['1'])
@@ -146,7 +149,9 @@ class YouTubeBot(BaseBot):
         :param str date: The video's publication date in ISO format
         :rtype: None
         """
-        if WikidataProperty.PublishedIn in self.existing_claims:
+        assert self.wiki_properties
+
+        if WikidataProperty.PublishedIn in self.wiki_properties.existing_claims:
             return
 
         claim = Claim(self.commons, WikidataProperty.PublishedIn)
@@ -161,7 +166,7 @@ class YouTubeBot(BaseBot):
         published_date_qualifier.setTarget(wb_ts)
         claim.addQualifier(published_date_qualifier)
 
-        self.new_claims.append(claim.toJSON())
+        self.wiki_properties.new_claims.append(claim)
 
     def hook_creator_claim(self, claim: Claim) -> None:
         assert self.video

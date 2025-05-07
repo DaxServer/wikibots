@@ -43,7 +43,6 @@ class PhotoData:
 
 
 class INaturalistBot(BaseBot):
-    photo: PhotoData
     redis_prefix = 'ZHXgxFHT4ZBJjR+fLxCH9quuLYl7ky4N6fNV/oC4fbs='
     summary = 'add [[Commons:Structured data|SDC]] based on metadata from iNaturalist. Test run.'
 
@@ -52,6 +51,7 @@ class INaturalistBot(BaseBot):
 
         self.generator = SearchPageGenerator(f'file: hastemplate:iNaturalist hastemplate:iNaturalistReview -haswbstatement:{WikidataProperty.INaturalistPhotoId}', site=self.commons)
         self.inaturalist_wd = ItemPage(self.wikidata, WikidataEntity.iNaturalist)
+        self.photo: PhotoData | None = None
 
     def skip_page(self, page: BasePage) -> bool:
         redis_key = f'{self.redis_prefix}:commons:M{page.pageid}'
@@ -59,6 +59,9 @@ class INaturalistBot(BaseBot):
         return self.redis.exists(redis_key) or self.commons.username() in page.contributors()
 
     def treat_page(self) -> None:
+        # Reset
+        self.photo = None
+
         super().treat_page()
 
         status = self.retrieve_template_data(['iNaturalistReview', 'iNaturalistreview'], ['status'])
@@ -67,13 +70,13 @@ class INaturalistBot(BaseBot):
 
         if status not in ['pass', 'pass-change']:
             warning(f'Skipping as iNaturalistReview status is {status}')
-            self.redis.set(self.main_redis_key, 1)
+            self.redis.set(self.wiki_properties.redis_key, 1)
             return
 
         self.fetch_claims()
         self.fetch_observation_data()
 
-        if not hasattr(self, 'photo'):
+        if self.photo is None:
             return
 
         self.create_id_claim(WikidataProperty.INaturalistPhotoId, self.photo.id)
@@ -87,6 +90,8 @@ class INaturalistBot(BaseBot):
         self.save()
 
     def fetch_observation_data(self) -> None:
+        assert self.wiki_properties
+
         observation_id = self.retrieve_template_data(['iNaturalist', 'inaturalist'], ['id', '1'])
         if observation_id is None:
             return
@@ -98,7 +103,7 @@ class INaturalistBot(BaseBot):
         matches = re.match(r'https://www.inaturalist.org/photos/(\d+)', photo_url)
         if matches is None:
             warning(f'Skipping as INaturalist URL is invalid {photo_url}')
-            self.redis.set(self.main_redis_key, 1)
+            self.redis.set(self.wiki_properties.redis_key, 1)
             return
 
         self.photo = PhotoData(id=matches.group(1), observation_id=observation_id)
@@ -112,12 +117,12 @@ class INaturalistBot(BaseBot):
             }, timeout=30).json()['results'][0]
         except Exception as e:
             warning(f'Failed to fetch observation: {e}')
-            self.redis.set(self.main_redis_key, 1)
+            self.redis.set(self.wiki_properties.redis_key, 1)
             return
 
         if self.photo.id not in [o['photo_id'].__str__() for o in observation['observation_photos']]:
             warning('Skipping as iNaturalist photo is not attached to observation')
-            self.redis.set(self.main_redis_key, 1)
+            self.redis.set(self.wiki_properties.redis_key, 1)
             return
 
         if 'user' in observation:
@@ -129,6 +134,8 @@ class INaturalistBot(BaseBot):
         self.determine_taxa(observation)
 
     def determine_taxa(self, observation: dict) -> None:
+        assert self.photo
+
         if observation['quality_grade'] != 'research':
             warning(f'Skipping as observation quality grade is not {observation['quality_grade']}')
             return
@@ -158,14 +165,14 @@ class INaturalistBot(BaseBot):
             break
 
     def hook_creator_claim(self, claim: Claim) -> None:
-        assert hasattr(self, 'photo') and self.photo.creator is not None
+        assert self.photo and self.photo.creator
 
         inaturalist_user_id_qualifier = Claim(self.commons, WikidataProperty.INaturalistUserId)
         inaturalist_user_id_qualifier.setTarget(self.photo.creator.id)
         claim.addQualifier(inaturalist_user_id_qualifier)
 
     def hook_depicts_claim(self, claim: Claim) -> None:
-        assert hasattr(self, 'photo') and self.photo.depicts is not None
+        assert self.photo and self.photo.depicts
 
         stated_in_ref = Claim(self.commons, WikidataProperty.StatedIn)
         stated_in_ref.setTarget(self.inaturalist_wd)
