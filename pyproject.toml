@@ -5,7 +5,7 @@ authors = [
     {name = "DaxServer",email = "daxserver@icloud.com"}
 ]
 readme = "README.md"
-requires-python = ">=3.12"
+requires-python = ">=3.12,<4.0"
 dependencies = [
     "pywikibot (>=10.0.0,<11.0.0)",
     "python-dateutil (>=2.9.0.post0,<3.0.0)",
@@ -15,6 +15,7 @@ dependencies = [
     "flickr-photos-api (>=2.18.0,<3.0.0)",
     "flickr-url-parser (>=1.11.0,<2.0.0)",
     "redis (>=5.2.1,<6.0.0)",
+    "fakeredis (>=2.29.0,<3.0.0)",
 ]
 
 [tool.poetry]

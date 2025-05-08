@@ -59,7 +59,14 @@ class BaseBot(ExistingPageBot):
         self.commons = Site("commons", "commons", user=os.getenv("PWB_USERNAME"))
         self.commons.login()
 
-        self.redis = Redis(host='redis.svc.tools.eqiad1.wikimedia.cloud', db=9)
+        info(os.getenv('TOOL_REDIS_URI'))
+
+        if os.getenv('TOOL_REDIS_URI'):
+            self.redis = Redis.from_url(os.getenv('TOOL_REDIS_URI'), db=9)
+        else:
+            from fakeredis import FakeServer, FakeStrictRedis
+            server = FakeServer()
+            self.redis = FakeStrictRedis(server=server)
 
         self.user_agent = f"{self.commons.username()} / Wikimedia Commons / {os.getenv('EMAIL')}"
         self.wiki_properties: WikiProperties | None = None
