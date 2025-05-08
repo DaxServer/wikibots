@@ -1,13 +1,16 @@
 import json
 import os
 from contextlib import suppress
+from dataclasses import dataclass, field
+from datetime import datetime
 from pprint import pprint
 from time import perf_counter
 from typing import Any
 
 import mwparserfromhell
 from deepdiff import DeepDiff
-from pywikibot import Site, info, critical, Claim, ItemPage, warning
+from mwparserfromhell.wikicode import Wikicode
+from pywikibot import Site, info, critical, Claim, ItemPage, warning, WbTime, Timestamp
 from pywikibot.bot import ExistingPageBot
 from pywikibot.data.api import Request
 from pywikibot.page import BasePage
@@ -21,10 +24,18 @@ except ImportError:
     from wikibots.lib.wikidata import WikidataEntity, WikidataProperty
 
 
+@dataclass
+class WikiProperties:
+    mid: str
+    redis_key: str
+    existing_claims: ClaimCollection
+    new_claims: list[Claim] = field(default_factory=list)
+    wikicode: Wikicode | None = None
+
+
 class BaseBot(ExistingPageBot):
     summary = 'add [[Commons:Structured data|SDC]] based on metadata'
     redis_prefix = ''
-    main_redis_key = ''
     throttle = 10
 
     def __init__(self, **kwargs: Any):
@@ -48,74 +59,78 @@ class BaseBot(ExistingPageBot):
         self.commons = Site("commons", "commons", user=os.getenv("PWB_USERNAME"))
         self.commons.login()
 
-        self.redis = Redis(host='redis.svc.tools.eqiad1.wikimedia.cloud', db=9)
+        if os.getenv('TOOL_REDIS_URI'):
+            self.redis = Redis.from_url(os.getenv('TOOL_REDIS_URI'), db=9)
+        else:
+            from fakeredis import FakeServer, FakeStrictRedis
+            server = FakeServer()
+            self.redis = FakeStrictRedis(server=server)
 
-        self.user_agent = f"{self.commons.username()} / Wikimedia Commons / {os.getenv("EMAIL")}"
-        self.mid = ''
-        self.new_claims: list[dict] = []
-        self.existing_claims: ClaimCollection = ClaimCollection(repo=self.commons)
+        self.user_agent = f"{self.commons.username()} / Wikimedia Commons / {os.getenv('EMAIL')}"
+        self.wiki_properties: WikiProperties | None = None
 
     def skip_page(self, page: BasePage) -> bool:
         return self.redis.exists(f'{self.redis_prefix}:commons:M{page.pageid}')
 
     def treat_page(self) -> None:
-        self.mid = f'M{self.current_page.pageid}'
-        info(self.current_page.full_url())
-        info(self.mid)
+        mid = f'M{self.current_page.pageid}'
+        self.wiki_properties = WikiProperties(
+            mid=mid,
+            redis_key=f'{self.redis_prefix}:commons:{mid}',
+            existing_claims=ClaimCollection(repo=self.commons),
+        )
 
-        self.main_redis_key = f'{self.redis_prefix}:commons:{self.mid}'
+        info(self.current_page.full_url())
+        info(self.wiki_properties.mid)
 
     def fetch_claims(self) -> None:
-        request: Request = self.commons.simple_request(action="wbgetentities", ids=self.mid)
-        statements = request.submit().get('entities').get(self.mid).get('statements', [])
+        assert self.wiki_properties
 
-        self.new_claims = []
-        self.existing_claims = ClaimCollection.fromJSON(data=statements, repo=self.commons)
+        request: Request = self.commons.simple_request(action="wbgetentities", ids=self.wiki_properties.mid)
+        statements = request.submit().get('entities').get(self.wiki_properties.mid).get('statements', [])
+
+        self.wiki_properties.existing_claims = ClaimCollection.fromJSON(data=statements, repo=self.commons)
 
     def retrieve_template_data(self, templates: list[str], parameters: list[str]) -> str | None:
-        wikitext = mwparserfromhell.parse(self.current_page.text)
+        assert self.wiki_properties
 
-        inaturalist_templates = [w for w in wikitext.filter_templates() if w.name.strip() in templates]
-        if not inaturalist_templates:
+        if self.wiki_properties.wikicode is None:
+            self.wiki_properties.wikicode = mwparserfromhell.parse(self.current_page.text)
+
+        _templates = [w for w in self.wiki_properties.wikicode.filter_templates() if w.name.strip() in templates]
+        if not _templates:
             warning(f'No match template found for {templates}')
-            self.redis.set(self.main_redis_key, 1)
+            self.redis.set(self.wiki_properties.redis_key, 1)
             return None
 
-        t = inaturalist_templates[0]
+        t = _templates[0]
         for param in parameters:
             if t.has(param):
                 data = str(t.get(param).value).strip()
-                info(f'{t.name} has {param} : {data}')
+                info(f'{t.name.strip()} has {param}: {data}')
 
                 return data
 
-        warning(f'{t.name} template is missing parameters: {parameters}')
-        self.redis.set(self.main_redis_key, 1)
+        warning(f'{t.name.strip()} template is missing parameters: {parameters}')
+        self.redis.set(self.wiki_properties.redis_key, 1)
 
         return None
 
-    def create_id_claim(self, property: str, value: str) -> None:
-        if property in self.existing_claims:
-            return
-
-        claim = Claim(self.commons, property)
-        claim.setTarget(value)
-
-        self.new_claims.append(claim.toJSON())
-
     def create_creator_claim(self, author_name_string: str | None = None, url: str | None = None) -> None:
-        if WikidataProperty.Creator in self.existing_claims:
+        assert self.wiki_properties
+
+        if WikidataProperty.Creator in self.wiki_properties.existing_claims:
             return
 
         claim = Claim(self.commons, WikidataProperty.Creator)
         claim.setSnakType('somevalue')
 
-        if author_name_string is not None:
+        if author_name_string:
             author_qualifier = Claim(self.commons, WikidataProperty.AuthorNameString)
             author_qualifier.setTarget(author_name_string)
             claim.addQualifier(author_qualifier)
 
-        if url is not None:
+        if url:
             url_qualifier = Claim(self.commons, WikidataProperty.Url)
             url_qualifier.setTarget(url)
             claim.addQualifier(url_qualifier)
@@ -123,13 +138,70 @@ class BaseBot(ExistingPageBot):
         with suppress(AssertionError):
             self.hook_creator_claim(claim)
 
-        self.new_claims.append(claim.toJSON())
+        self.wiki_properties.new_claims.append(claim)
 
-    def hook_creator_claim(self, claim: Claim) -> None:
-        pass
+    def create_depicts_claim(self, depicts: ItemPage | None) -> None:
+        assert self.wiki_properties
+
+        if WikidataProperty.Depicts in self.wiki_properties.existing_claims or depicts is None:
+            return
+
+        claim = Claim(self.commons, WikidataProperty.Depicts)
+        claim.setTarget(depicts)
+
+        with suppress(AssertionError):
+            self.hook_depicts_claim(claim)
+
+        self.wiki_properties.new_claims.append(claim)
+
+    def create_id_claim(self, property: str, value: str) -> None:
+        assert self.wiki_properties
+
+        if property in self.wiki_properties.existing_claims:
+            return
+
+        claim = Claim(self.commons, property)
+        claim.setTarget(value)
+
+        self.wiki_properties.new_claims.append(claim)
+
+    def create_inception_claim(self, wbtime: WbTime, granularity: str) -> None:
+        assert self.wiki_properties
+
+        if WikidataProperty.Inception in self.wiki_properties.existing_claims:
+            return
+
+        claim = Claim(self.commons, WikidataProperty.Inception)
+        claim.setTarget(wbtime)
+
+        if granularity == 'circa':
+            circa_qualifier = Claim(self.commons, WikidataProperty.SourcingCircumstances)
+            circa_qualifier.setTarget(ItemPage(self.wikidata, WikidataEntity.Circa))
+            claim.addQualifier(circa_qualifier)
+
+        self.wiki_properties.new_claims.append(claim)
+
+    def create_published_in_claim(self, published_in: str, date_posted: datetime) -> None:
+        assert self.wiki_properties
+
+        if WikidataProperty.PublishedIn in self.wiki_properties.existing_claims:
+            return
+
+        claim = Claim(self.commons, WikidataProperty.PublishedIn)
+        claim.setTarget(ItemPage(self.wikidata, published_in))
+
+        ts = Timestamp.fromISOformat(date_posted.isoformat())
+
+        date_posted_qualifier = Claim(self.commons, WikidataProperty.PublicationDate)
+        date_posted_qualifier.setTarget(WbTime(ts.year, ts.month, ts.day, precision=WbTime.PRECISION['day']))
+        claim.addQualifier(date_posted_qualifier)
+
+        self.wiki_properties.new_claims.append(claim)
 
     def create_source_claim(self, source: str, operator: str) -> None:
-        if WikidataProperty.SourceOfFile in self.existing_claims:
+        assert self.wiki_properties
+
+        if WikidataProperty.SourceOfFile in self.wiki_properties.existing_claims:
             return
 
         claim = Claim(self.commons, WikidataProperty.SourceOfFile)
@@ -143,32 +215,27 @@ class BaseBot(ExistingPageBot):
         operator_qualifier.setTarget(ItemPage(self.wikidata, operator))
         claim.addQualifier(operator_qualifier)
 
-        self.new_claims.append(claim.toJSON())
-
-    def create_depicts_claim(self, depicts: ItemPage | None) -> None:
-        if WikidataProperty.Depicts in self.existing_claims or depicts is None:
-            return
-
-        claim = Claim(self.commons, WikidataProperty.Depicts)
-        claim.setTarget(depicts)
-
-        with suppress(AssertionError):
-            self.hook_depicts_claim(claim)
-
-        self.new_claims.append(claim.toJSON())
+        self.wiki_properties.new_claims.append(claim)
 
     def hook_depicts_claim(self, claim: Claim) -> None:
         pass
 
+    def hook_creator_claim(self, claim: Claim) -> None:
+        pass
+
     def save(self) -> None:
-        if not self.new_claims:
+        assert self.wiki_properties
+
+        if not self.wiki_properties.new_claims:
             info("No claims to set")
             return
 
+        claims = [claim.toJSON() for claim in self.wiki_properties.new_claims]
+
         payload = {
             "action": "wbeditentity",
-            "id": self.mid,
-            "data": json.dumps({"claims": self.new_claims}),
+            "id": self.wiki_properties.mid,
+            "data": json.dumps({"claims": claims}),
             "token": self.commons.get_tokens("csrf")['csrf'],
             "summary": self.summary,
             "tags": "BotSDC",
@@ -176,14 +243,11 @@ class BaseBot(ExistingPageBot):
         }
         request = self.commons.simple_request(**payload)
 
-        pprint(DeepDiff([], self.new_claims))
+        pprint(DeepDiff([], claims))
 
         try:
             start = perf_counter()
             request.submit()
-            info(f"Updating {self.mid} took {(perf_counter() - start):.1f} s")
+            info(f"Updating {self.wiki_properties.mid} took {(perf_counter() - start):.1f} s")
         except Exception as e:
             critical(f"Failed to update: {e}")
-
-        self.mid = ''
-        self.new_claims = []
