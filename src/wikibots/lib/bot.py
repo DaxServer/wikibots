@@ -59,8 +59,6 @@ class BaseBot(ExistingPageBot):
         self.commons = Site("commons", "commons", user=os.getenv("PWB_USERNAME"))
         self.commons.login()
 
-        info(os.getenv('TOOL_REDIS_URI'))
-
         if os.getenv('TOOL_REDIS_URI'):
             self.redis = Redis.from_url(os.getenv('TOOL_REDIS_URI'), db=9)
         else:
