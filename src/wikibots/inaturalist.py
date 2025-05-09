@@ -44,7 +44,7 @@ class PhotoData:
 
 class INaturalistBot(BaseBot):
     redis_prefix = 'ZHXgxFHT4ZBJjR+fLxCH9quuLYl7ky4N6fNV/oC4fbs='
-    summary = 'add [[Commons:Structured data|SDC]] based on metadata from iNaturalist. Test run.'
+    summary = 'add [[Commons:Structured data|SDC]] based on metadata from iNaturalist'
 
     def __init__(self, **kwargs: Any):
         super().__init__(**kwargs)
