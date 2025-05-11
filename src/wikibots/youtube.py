@@ -39,7 +39,7 @@ class YouTubeBot(BaseBot):
     summary = 'add [[Commons:Structured data|SDC]] based on metadata from YouTube'
 
     # Throttle to 30 seconds to be under YouTube API quota 10k/day
-    throttle = 30
+    # throttle = 30
 
     def __init__(self, **kwargs: Any):
         """
@@ -53,11 +53,51 @@ class YouTubeBot(BaseBot):
         super().__init__(**kwargs)
 
         self.generator = SearchPageGenerator(f'file: incategory:"License review needed (video)" filemime:video hastemplate:"YouTube CC-BY" -haswbstatement:{WikidataProperty.YouTubeVideoId}', site=self.commons)
+        self.generator = SearchPageGenerator(f'file: filemime:video haswbstatement:{WikidataProperty.SourceOfFile}={WikidataEntity.FileAvailableOnInternet}[{WikidataProperty.Operator}={WikidataEntity.YouTube}] haswbstatement:{WikidataProperty.YouTubeVideoId}', site=self.commons)
 
         self.youtube = googleapiclient.discovery.build('youtube', 'v3', developerKey=os.getenv('YOUTUBE_API_KEY'))
         self.video: YouTubeVideo | None = None
 
+        self.items = {
+            'youtube': ItemPage(self.wikidata, WikidataEntity.YouTube),
+        }
+
     def treat_page(self) -> None:
+        self.video = None
+        super().treat_page()
+        self.fetch_claims()
+
+        claims = self.wiki_properties.existing_claims.get(WikidataProperty.SourceOfFile, [])
+
+        if len(claims) != 1:
+            warning('Invalid number of claims found')
+            return
+
+        existing_claim: Claim = claims[0]
+
+        new_claim = Claim(self.commons, WikidataProperty.SourceOfFile, snak=existing_claim.snak, hash=existing_claim.hash)
+        new_claim.setSnakType(existing_claim.getSnakType())
+        new_claim.setTarget(existing_claim.getTarget())
+        new_claim.setRank(existing_claim.getRank())
+
+        for property, qualifiers in existing_claim.qualifiers.items():
+            for q in qualifiers:
+                if property == WikidataProperty.Operator and q.getTarget() == self.items['youtube']:
+                    continue
+
+                new_claim.addQualifier(Claim.qualifierFromJSON(self.commons, q.toJSON()))
+
+        for source in existing_claim.sources:
+            new_claim.addSource(Claim.sourceFromJSON(self.commons, source.toJSON()))
+
+        content_deliverer_qualifier = Claim(self.commons, WikidataProperty.ContentDeliverer)
+        content_deliverer_qualifier.setTarget(self.items['youtube'])
+        new_claim.addQualifier(content_deliverer_qualifier)
+
+        self.wiki_properties.new_claims.append(new_claim)
+        self.save()
+
+    def treat_page1(self) -> None:
         """
         Processes the page to extract YouTube metadata and update Wikidata claims.
         
