@@ -75,6 +75,10 @@ class YouTubeBot(BaseBot):
 
         existing_claim: Claim = claims[0]
 
+        if len(existing_claim.sources) > 0:
+            warning('Claim has sources. Skipping.')
+            return
+
         new_claim = Claim(self.commons, WikidataProperty.SourceOfFile, snak=existing_claim.snak, hash=existing_claim.hash)
         new_claim.setSnakType(existing_claim.getSnakType())
         new_claim.setTarget(existing_claim.getTarget())
@@ -86,9 +90,6 @@ class YouTubeBot(BaseBot):
                     continue
 
                 new_claim.addQualifier(Claim.qualifierFromJSON(self.commons, q.toJSON()))
-
-        for source in existing_claim.sources:
-            new_claim.addSource(Claim.sourceFromJSON(self.commons, source.toJSON()))
 
         content_deliverer_qualifier = Claim(self.commons, WikidataProperty.ContentDeliverer)
         content_deliverer_qualifier.setTarget(self.items['youtube'])
