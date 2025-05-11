@@ -91,6 +91,10 @@ class YouTubeBot(BaseBot):
 
                 new_claim.addQualifier(Claim.qualifierFromJSON(self.commons, q.toJSON()))
 
+        if new_claim.same_as(existing_claim):
+            info('Claim is unchanged. Skipping.')
+            return
+
         content_deliverer_qualifier = Claim(self.commons, WikidataProperty.ContentDeliverer)
         content_deliverer_qualifier.setTarget(self.items['youtube'])
         new_claim.addQualifier(content_deliverer_qualifier)
