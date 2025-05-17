@@ -91,7 +91,7 @@ class YouTubeBot(BaseBot):
 
         self.create_published_in_claim(self.video.published_at)
         self.create_creator_claim(self.video.channel.title)
-        self.create_source_claim(f'https://www.youtube.com/watch?v={youtube_id}', WikidataEntity.YouTube)
+        self.create_source_claim(f'https://www.youtube.com/watch?v={youtube_id}')
 
         self.save()
 
