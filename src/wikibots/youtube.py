@@ -57,6 +57,10 @@ class YouTubeBot(BaseBot):
         self.youtube = googleapiclient.discovery.build('youtube', 'v3', developerKey=os.getenv('YOUTUBE_API_KEY'))
         self.video: YouTubeVideo | None = None
 
+        self.items = {
+            'youtube': ItemPage(self.wikidata, WikidataEntity.YouTube),
+        }
+
     def treat_page(self) -> None:
         """
         Processes the page to extract YouTube metadata and update Wikidata claims.
@@ -87,7 +91,7 @@ class YouTubeBot(BaseBot):
 
         self.create_published_in_claim(self.video.published_at)
         self.create_creator_claim(self.video.channel.title)
-        self.create_source_claim(f'https://www.youtube.com/watch?v={youtube_id}', WikidataEntity.YouTube)
+        self.create_source_claim(f'https://www.youtube.com/watch?v={youtube_id}')
 
         self.save()
 
@@ -180,6 +184,12 @@ class YouTubeBot(BaseBot):
         youtube_channel_id_qualifier.setTarget(self.video.channel.id)
         claim.addQualifier(youtube_channel_id_qualifier)
 
+    def hook_source_claim(self, claim: Claim) -> None:
+        assert self.video
+
+        content_deliverer_qualifier = Claim(self.commons, WikidataProperty.ContentDeliverer)
+        content_deliverer_qualifier.setTarget(self.items['youtube'])
+        claim.addQualifier(content_deliverer_qualifier)
 
 def main():
     """

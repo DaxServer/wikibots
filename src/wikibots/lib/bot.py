@@ -203,7 +203,7 @@ class BaseBot(ExistingPageBot):
 
         self.wiki_properties.new_claims.append(claim)
 
-    def create_source_claim(self, source: str, operator: str) -> None:
+    def create_source_claim(self, source: str, operator: str | None = None) -> None:
         assert self.wiki_properties
 
         if WikidataProperty.SourceOfFile in self.wiki_properties.existing_claims:
@@ -216,16 +216,23 @@ class BaseBot(ExistingPageBot):
         described_at_url_qualifier.setTarget(source)
         claim.addQualifier(described_at_url_qualifier)
 
-        operator_qualifier = Claim(self.commons, WikidataProperty.Operator)
-        operator_qualifier.setTarget(ItemPage(self.wikidata, operator))
-        claim.addQualifier(operator_qualifier)
+        if operator:
+            operator_qualifier = Claim(self.commons, WikidataProperty.Operator)
+            operator_qualifier.setTarget(ItemPage(self.wikidata, operator))
+            claim.addQualifier(operator_qualifier)
+
+        with suppress(AssertionError):
+            self.hook_source_claim(claim)
 
         self.wiki_properties.new_claims.append(claim)
+
+    def hook_creator_claim(self, claim: Claim) -> None:
+        pass
 
     def hook_depicts_claim(self, claim: Claim) -> None:
         pass
 
-    def hook_creator_claim(self, claim: Claim) -> None:
+    def hook_source_claim(self, claim: Claim) -> None:
         pass
 
     def get_file_hash(self) -> str:
