@@ -31,6 +31,7 @@ class WikidataProperty:
     INaturalistUserId = "P12022"
     Inception = "P571"
     Operator = "P137"
+    PortableAntiquitiesSchemeImageID = "P13556"
     PublicationDate = "P577"
     PublishedIn = "P1433"
     StatedIn = "P248"
