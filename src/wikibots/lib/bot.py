@@ -31,6 +31,7 @@ class WikiProperties:
     existing_claims: ClaimCollection
     new_claims: list[Claim] = field(default_factory=list)
     wikicode: Wikicode | None = None
+    hash: str | None = None
 
 
 class BaseBot(ExistingPageBot):
@@ -91,11 +92,15 @@ class BaseBot(ExistingPageBot):
 
         self.wiki_properties.existing_claims = ClaimCollection.fromJSON(data=statements, repo=self.commons)
 
-    def retrieve_template_data(self, templates: list[str], parameters: list[str]) -> str | None:
+    def parse_wikicode(self) -> None:
         assert self.wiki_properties
 
         if self.wiki_properties.wikicode is None:
             self.wiki_properties.wikicode = mwparserfromhell.parse(self.current_page.text)
+
+    def retrieve_template_data(self, templates: list[str], parameters: list[str]) -> str | None:
+        assert self.wiki_properties
+        self.parse_wikicode()
 
         _templates = [w for w in self.wiki_properties.wikicode.filter_templates() if w.name.strip() in templates]
         if not _templates:
@@ -222,6 +227,31 @@ class BaseBot(ExistingPageBot):
 
     def hook_creator_claim(self, claim: Claim) -> None:
         pass
+
+    def get_file_hash(self) -> str:
+        assert self.wiki_properties
+
+        if self.wiki_properties.hash:
+            return self.wiki_properties.hash
+
+        payload = {
+            "action": "query",
+            "prop": "imageinfo",
+            "pageids": self.current_page.pageid,
+            "iiprop": "sha1",
+            "format": "json",
+            "formatversion": "2",
+        }
+
+        try:
+            start = perf_counter()
+            response = self.commons.simple_request(**payload).submit()
+            info(f"Queried Wiki file hash in {(perf_counter() - start) * 1000:.1f} ms")
+            self.wiki_properties.hash = response['query']['pages'][0]['imageinfo'][0]['sha1']
+        except Exception as e:
+            critical(f"Failed to get file hash: {e}")
+
+        return self.wiki_properties.hash or ''
 
     def save(self) -> None:
         assert self.wiki_properties
