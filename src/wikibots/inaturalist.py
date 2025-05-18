@@ -32,6 +32,7 @@ WHERE
 class User:
     id: str
     name: str | None = None
+    orcid: str | None = None
 
 
 @dataclass
@@ -42,6 +43,26 @@ class PhotoData:
     depicts: ItemPage | None = None
 
 
+def _extract_orcid_id(orcid_url: str | None) -> str | None:
+    """Extract ORCID ID from URL.
+
+    Args:
+        orcid_url: ORCID URL or None
+
+    Returns:
+        ORCID ID or None
+    """
+    if not orcid_url:
+        return None
+
+    # Extract ORCID ID from URL (e.g., https://orcid.org/0000-0000-0000-0000)
+    # Using a simpler regex pattern that matches the ORCID format
+    # WikidataProperty.ORCID is P496
+    matches = re.search(r'(\d{4}-\d{4}-\d{4}-\d{3}[\dX])', orcid_url)
+
+    return matches.group(1) if matches else None
+
+
 class INaturalistBot(BaseBot):
     redis_prefix = 'ZHXgxFHT4ZBJjR+fLxCH9quuLYl7ky4N6fNV/oC4fbs='
     summary = 'add [[Commons:Structured data|SDC]] based on metadata from iNaturalist'
@@ -50,6 +71,7 @@ class INaturalistBot(BaseBot):
         super().__init__(**kwargs)
 
         self.generator = SearchPageGenerator(f'file: hastemplate:iNaturalist hastemplate:iNaturalistReview -haswbstatement:{WikidataProperty.INaturalistPhotoId}', site=self.commons)
+
         self.inaturalist_wd = ItemPage(self.wikidata, WikidataEntity.iNaturalist)
         self.photo: PhotoData | None = None
 
@@ -129,6 +151,7 @@ class INaturalistBot(BaseBot):
             self.photo.creator = User(
                 id=observation['user']['id'].__str__(),
                 name=observation['user'].get('name', None) or observation['user'].get('login', None),
+                orcid=_extract_orcid_id(observation['user'].get('orcid', None)),
             )
 
         self.determine_taxa(observation)
@@ -137,7 +160,7 @@ class INaturalistBot(BaseBot):
         assert self.photo
 
         if observation['quality_grade'] != 'research':
-            warning(f'Skipping as observation quality grade is not {observation['quality_grade']}')
+            warning(f'Skipping as observation quality grade is {observation['quality_grade']}')
             return
 
         if 'prefers_community_taxon' in observation['preferences'] and observation['preferences']['prefers_community_taxon']:
@@ -170,6 +193,11 @@ class INaturalistBot(BaseBot):
         inaturalist_user_id_qualifier = Claim(self.commons, WikidataProperty.INaturalistUserId)
         inaturalist_user_id_qualifier.setTarget(self.photo.creator.id)
         claim.addQualifier(inaturalist_user_id_qualifier)
+
+        if self.photo.creator.orcid:
+            orcid_qualifier = Claim(self.commons, WikidataProperty.ORCID)
+            orcid_qualifier.setTarget(self.photo.creator.orcid)
+            claim.addQualifier(orcid_qualifier)
 
     def hook_depicts_claim(self, claim: Claim) -> None:
         assert self.photo and self.photo.depicts

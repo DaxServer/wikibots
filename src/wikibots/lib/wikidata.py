@@ -30,6 +30,7 @@ class WikidataProperty:
     INaturalistTaxonId = "P3151"
     INaturalistUserId = "P12022"
     Inception = "P571"
+    ORCID = "P496"
     Operator = "P137"
     PortableAntiquitiesSchemeImageID = "P13556"
     PublicationDate = "P577"
