@@ -71,17 +71,16 @@ class PortableAntiquitiesSchemeBot(BaseBot):
 
         start = perf_counter()
         try:
-            image = self.session.get(f'https://finds.org.uk/database/ajax/download/id/{image_id}', stream=True, timeout=30)
+            sha1_hash = hashlib.sha1()
+            with self.session.get(f'https://finds.org.uk/database/ajax/download/id/{image_id}', stream=True, timeout=30) as image:
+                for data in image.iter_content(chunk_size=1024):
+                    sha1_hash.update(data)
+            image_hash = sha1_hash.hexdigest()
+            info(f"Calculated hash in {(perf_counter() - start):.1f} s")
         except Exception as e:
             warning(f'Failed to fetch image: {e}')
             self.redis.set(self.wiki_properties.redis_key, 1)
             return
-
-        sha1_hash = hashlib.sha1()
-        for data in image.iter_content(chunk_size=1024):
-            sha1_hash.update(data)
-        image_hash = sha1_hash.hexdigest()
-        info(f"Calculated hash in {(perf_counter() - start):.1f} s")
 
         if image_hash != self.get_file_hash():
             warning(f'Invalid image hash found: {image_hash} != {self.get_file_hash()}')

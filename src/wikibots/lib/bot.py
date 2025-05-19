@@ -308,5 +308,4 @@ class BaseBot(ExistingPageBot):
 
     def teardown(self) -> None:
         """Close the session and any other resources."""
-        if hasattr(self, 'session'):
-            self.session.close()
+        self.session.close()

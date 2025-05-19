@@ -167,7 +167,7 @@ class INaturalistBot(BaseBot):
         assert self.photo
 
         if observation['quality_grade'] != 'research':
-            warning(f'Skipping as observation quality grade is {observation['quality_grade']}')
+            warning(f'Skipping as observation quality grade is {observation["quality_grade"]}')
             return
 
         if 'prefers_community_taxon' in observation['preferences'] and observation['preferences'][
@@ -207,7 +207,7 @@ class INaturalistBot(BaseBot):
             orcid_qualifier.setTarget(self.photo.creator.orcid)
             claim.addQualifier(orcid_qualifier)
 
-    def hook_creator_target(self, claim: Claim, creator_item: ItemPage | None = None) -> None:
+    def hook_creator_target(self, claim: Claim) -> None:
         assert self.photo and self.photo.creator
 
         creator_item = self.find_creator_wikidata_item()
