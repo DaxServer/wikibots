@@ -5,7 +5,6 @@ import sys
 from dataclasses import dataclass
 from typing import Any
 
-import requests
 from pywikibot import warning, info, Claim, ItemPage
 from pywikibot.page import BasePage
 from pywikibot.pagegenerators import SearchPageGenerator, WikidataSPARQLPageGenerator
@@ -18,12 +17,19 @@ except ImportError:
     from .lib.bot import BaseBot
     from .lib.wikidata import WikidataEntity, WikidataProperty
 
-
-sparql_query = string.Template(f'''
+sparql_taxa_query = string.Template(f'''
 SELECT DISTINCT ?item
 WHERE
 {{
     ?item wdt:{WikidataProperty.INaturalistTaxonId} "$taxa".
+}}
+''')
+
+sparql_user_query = string.Template(f'''
+SELECT DISTINCT ?item
+WHERE
+{{
+    ?item wdt:{WikidataProperty.INaturalistUserId} "$user_id".
 }}
 ''')
 
@@ -70,7 +76,9 @@ class INaturalistBot(BaseBot):
     def __init__(self, **kwargs: Any):
         super().__init__(**kwargs)
 
-        self.generator = SearchPageGenerator(f'file: hastemplate:iNaturalist hastemplate:iNaturalistReview -haswbstatement:{WikidataProperty.INaturalistPhotoId}', site=self.commons)
+        self.generator = SearchPageGenerator(
+            f'file: hastemplate:iNaturalist hastemplate:iNaturalistReview -haswbstatement:{WikidataProperty.INaturalistPhotoId}',
+            site=self.commons)
 
         self.inaturalist_wd = ItemPage(self.wikidata, WikidataEntity.iNaturalist)
         self.photo: PhotoData | None = None
@@ -133,9 +141,8 @@ class INaturalistBot(BaseBot):
         info(f'INaturalist Observation ID: {observation_id}')
 
         try:
-            observation = requests.get(f'https://api.inaturalist.org/v1/observations/{observation_id}', headers={
+            observation = self.session.get(f'https://api.inaturalist.org/v1/observations/{observation_id}', headers={
                 'Accept': 'application/json',
-                'User-Agent': self.user_agent,
             }, timeout=30).json()['results'][0]
         except Exception as e:
             warning(f'Failed to fetch observation: {e}')
@@ -163,7 +170,8 @@ class INaturalistBot(BaseBot):
             warning(f'Skipping as observation quality grade is {observation['quality_grade']}')
             return
 
-        if 'prefers_community_taxon' in observation['preferences'] and observation['preferences']['prefers_community_taxon']:
+        if 'prefers_community_taxon' in observation['preferences'] and observation['preferences'][
+            'prefers_community_taxon']:
             info('Using community taxon')
             taxa = observation['community_taxon']
         else:
@@ -171,7 +179,7 @@ class INaturalistBot(BaseBot):
 
         for taxa_id in reversed(taxa['ancestor_ids']):
             info(f'Searching Wikidata for taxon with ID {taxa_id}')
-            gen = WikidataSPARQLPageGenerator(sparql_query.substitute(taxa=taxa_id), site=self.wikidata)
+            gen = WikidataSPARQLPageGenerator(sparql_taxa_query.substitute(taxa=taxa_id), site=self.wikidata)
             items = list(gen)
 
             if len(items) == 0:
@@ -199,6 +207,16 @@ class INaturalistBot(BaseBot):
             orcid_qualifier.setTarget(self.photo.creator.orcid)
             claim.addQualifier(orcid_qualifier)
 
+    def hook_creator_target(self, claim: Claim, creator_item: ItemPage | None = None) -> None:
+        assert self.photo and self.photo.creator
+
+        creator_item = self.find_creator_wikidata_item()
+
+        if creator_item:
+            claim.setTarget(creator_item)
+        else:
+            claim.setSnakType('somevalue')
+
     def hook_depicts_claim(self, claim: Claim) -> None:
         assert self.photo and self.photo.depicts
 
@@ -206,9 +224,31 @@ class INaturalistBot(BaseBot):
         stated_in_ref.setTarget(self.inaturalist_wd)
         claim.addSource(stated_in_ref)
 
+    def find_creator_wikidata_item(self) -> ItemPage | None:
+        """Find Wikidata item for the creator based on iNaturalist user ID."""
+        assert self.photo and self.photo.creator
+
+        info(f'Searching Wikidata for iNaturalist user with ID {self.photo.creator.id}')
+        gen = WikidataSPARQLPageGenerator(sparql_user_query.substitute(user_id=self.photo.creator.id),
+                                          site=self.wikidata)
+        items = list(gen)
+
+        if len(items) == 0:
+            return None
+
+        if len(items) > 1:
+            warning(
+                f'Found multiple Wikidata items for iNaturalist user https://www.inaturalist.org/people/{self.photo.creator.id}: {items}')
+            return None
+
+        info(f'Wikidata item for iNaturalist user found - {items[0].getID()}')
+
+        return items[0]
+
 
 def main() -> None:
-    INaturalistBot().run()
+    dry = '--dry' in sys.argv
+    INaturalistBot(dry=dry).run()
 
 
 if __name__ == "__main__":

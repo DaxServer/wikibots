@@ -1,6 +1,6 @@
 [project]
 name = "wikibots"
-version = "0.1.0"
+version = "1.0.0"
 authors = [
     {name = "DaxServer",email = "daxserver@icloud.com"}
 ]
@@ -15,7 +15,6 @@ dependencies = [
     "flickr-photos-api (>=2.18.0,<3.0.0)",
     "flickr-url-parser (>=1.11.0,<2.0.0)",
     "redis (>=5.2.1,<6.0.0)",
-    "fakeredis (>=2.29.0,<3.0.0)",
 ]
 
 [tool.poetry]
@@ -29,6 +28,9 @@ youtube = "wikibots.youtube:main"
 
 [tool.poetry.requires-plugins]
 poetry-plugin-export = ">=1.8"
+
+[tool.poetry.group.dev.dependencies]
+fakeredis = ">=2.29.0,<3.0.0"
 
 [build-system]
 requires = ["poetry-core>=2.0.0,<3.0.0"]
