@@ -5,10 +5,9 @@ import sys
 from time import perf_counter
 from typing import Any
 
-import requests
 from mwparserfromhell.nodes import ExternalLink
 from pywikibot import warning, info
-from pywikibot.pagegenerators import PagesFromTitlesGenerator, SearchPageGenerator
+from pywikibot.pagegenerators import SearchPageGenerator
 
 try:
     sys.path.append(os.path.dirname(os.path.abspath(__file__)) + '/lib')
@@ -21,7 +20,7 @@ except:
 
 class PortableAntiquitiesSchemeBot(BaseBot):
     redis_prefix = 'pas'
-    summary = 'add [[Commons:Structured data|SDC]] based on metadata from Portable Antiquities Scheme Database. Test run.'
+    summary = 'add [[Commons:Structured data|SDC]] based on metadata from Portable Antiquities Scheme Database'
 
     res = [
         r'https?://finds\.org\.uk/database/ajax/download/id/(\d+)/?',
@@ -57,10 +56,7 @@ class PortableAntiquitiesSchemeBot(BaseBot):
 
         start = perf_counter()
         try:
-            image = requests.get(f'https://finds.org.uk/database/images/image/id/{image_id}/recordtype/artefacts/format/json', headers={
-                'Accept': 'application/json',
-                'User-Agent': self.user_agent,
-            }, timeout=30).json()['image'][0]
+            image = self.session.get(f'https://finds.org.uk/database/images/image/id/{image_id}/recordtype/artefacts/format/json', timeout=30).json()['image'][0]
         except Exception as e:
             warning(f'Failed to fetch image: {e}')
             self.redis.set(self.wiki_properties.redis_key, 1)
@@ -75,17 +71,16 @@ class PortableAntiquitiesSchemeBot(BaseBot):
 
         start = perf_counter()
         try:
-            image = requests.get(f'https://finds.org.uk/database/ajax/download/id/{image_id}', stream=True, timeout=30)
+            sha1_hash = hashlib.sha1()
+            with self.session.get(f'https://finds.org.uk/database/ajax/download/id/{image_id}', stream=True, timeout=30) as image:
+                for data in image.iter_content(chunk_size=1024):
+                    sha1_hash.update(data)
+            image_hash = sha1_hash.hexdigest()
+            info(f"Calculated hash in {(perf_counter() - start):.1f} s")
         except Exception as e:
             warning(f'Failed to fetch image: {e}')
             self.redis.set(self.wiki_properties.redis_key, 1)
             return
-
-        sha1_hash = hashlib.sha1()
-        for data in image.iter_content(chunk_size=1024):
-            sha1_hash.update(data)
-        image_hash = sha1_hash.hexdigest()
-        info(f"Calculated hash in {(perf_counter() - start):.1f} s")
 
         if image_hash != self.get_file_hash():
             warning(f'Invalid image hash found: {image_hash} != {self.get_file_hash()}')
@@ -107,7 +102,8 @@ class PortableAntiquitiesSchemeBot(BaseBot):
 
 
 def main():
-    PortableAntiquitiesSchemeBot().run()
+    dry = '--dry' in sys.argv
+    PortableAntiquitiesSchemeBot(dry=dry).run()
 
 
 if __name__ == "__main__":

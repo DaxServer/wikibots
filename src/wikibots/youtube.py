@@ -44,7 +44,7 @@ class YouTubeBot(BaseBot):
     def __init__(self, **kwargs: Any):
         """
         Initializes the YouTubeBot instance.
-        
+
         Passes any keyword arguments to the base class initializer and configures key components:
           - A search generator to locate Commons files that lack a YouTube video ID.
           - A YouTube API client built with the API key from the environment.
@@ -64,7 +64,7 @@ class YouTubeBot(BaseBot):
     def treat_page(self) -> None:
         """
         Processes the page to extract YouTube metadata and update Wikidata claims.
-        
+
         Parses the current page's wikitext to retrieve the YouTube video ID from a
         "YouTube CC-BY" template, then uses the YouTube API to fetch video details such as
         the title, publication date, and channel information. If valid video data is found, 
@@ -144,7 +144,7 @@ class YouTubeBot(BaseBot):
     def create_published_in_claim(self, date: str) -> None:
         """
         Creates a published-in claim with a publication date qualifier.
-        
+
         If a PublishedIn claim already exists, no claim is created. Otherwise, this
         method constructs a new claim linking the video to YouTube and adds a qualifier
         for the publication date (normalized to day precision from the provided ISO date
@@ -194,11 +194,15 @@ class YouTubeBot(BaseBot):
 def main():
     """
     Entrypoint for running the YouTube bot.
-    
+
     Instantiates the YouTubeBot and initiates its execution, starting the process of
     retrieving video metadata and updating corresponding Wikidata claims.
+
+    If the --dry flag is provided, the bot will run in dry mode, which means it will
+    not save any changes to Wikimedia Commons and will exit after processing the first page.
     """
-    YouTubeBot().run()
+    dry = '--dry' in sys.argv
+    YouTubeBot(dry=dry).run()
 
 
 if __name__ == "__main__":

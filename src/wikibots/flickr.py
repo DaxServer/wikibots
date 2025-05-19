@@ -257,7 +257,8 @@ class FlickrBot(BaseBot):
 
 
 def main() -> None:
-    FlickrBot().run()
+    dry = '--dry' in sys.argv
+    FlickrBot(dry=dry).run()
 
 
 if __name__ == "__main__":

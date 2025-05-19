@@ -8,6 +8,7 @@ from time import perf_counter
 from typing import Any
 
 import mwparserfromhell
+import requests
 from deepdiff import DeepDiff
 from mwparserfromhell.wikicode import Wikicode
 from pywikibot import Site, info, critical, Claim, ItemPage, warning, WbTime, Timestamp
@@ -40,6 +41,9 @@ class BaseBot(ExistingPageBot):
     throttle = 10
 
     def __init__(self, **kwargs: Any):
+        # Extract 'dry' option before passing kwargs to parent
+        self.dry = kwargs.pop('dry', False)
+
         super().__init__(**kwargs)
 
         if os.getenv('PWB_CONSUMER_TOKEN') and os.getenv('PWB_CONSUMER_SECRET') and os.getenv(
@@ -69,6 +73,10 @@ class BaseBot(ExistingPageBot):
 
         self.user_agent = f"{self.commons.username()} / Wikimedia Commons / {os.getenv('EMAIL')}"
         self.wiki_properties: WikiProperties | None = None
+
+        # Initialize a session for HTTP requests
+        self.session = requests.Session()
+        self.session.headers.update({'User-Agent': self.user_agent})
 
     def skip_page(self, page: BasePage) -> bool:
         return self.redis.exists(f'{self.redis_prefix}:commons:M{page.pageid}')
@@ -128,7 +136,9 @@ class BaseBot(ExistingPageBot):
             return
 
         claim = Claim(self.commons, WikidataProperty.Creator)
-        claim.setSnakType('somevalue')
+
+        with suppress(AssertionError):
+            self.hook_creator_target(claim)
 
         if author_name_string:
             author_qualifier = Claim(self.commons, WikidataProperty.AuthorNameString)
@@ -229,6 +239,9 @@ class BaseBot(ExistingPageBot):
     def hook_creator_claim(self, claim: Claim) -> None:
         pass
 
+    def hook_creator_target(self, claim: Claim) -> None:
+        claim.setSnakType('somevalue')
+
     def hook_depicts_claim(self, claim: Claim) -> None:
         pass
 
@@ -269,6 +282,12 @@ class BaseBot(ExistingPageBot):
 
         claims = [claim.toJSON() for claim in self.wiki_properties.new_claims]
 
+        pprint(DeepDiff([], claims))
+
+        if self.dry:
+            info("Dry run mode: skipping save operation")
+            self.exit()
+
         payload = {
             "action": "wbeditentity",
             "id": self.wiki_properties.mid,
@@ -280,11 +299,13 @@ class BaseBot(ExistingPageBot):
         }
         request = self.commons.simple_request(**payload)
 
-        pprint(DeepDiff([], claims))
-
         try:
             start = perf_counter()
             request.submit()
             info(f"Updating {self.wiki_properties.mid} took {(perf_counter() - start):.1f} s")
         except Exception as e:
             critical(f"Failed to update: {e}")
+
+    def teardown(self) -> None:
+        """Close the session and any other resources."""
+        self.session.close()
