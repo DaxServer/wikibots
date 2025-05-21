@@ -72,6 +72,8 @@ def _extract_orcid_id(orcid_url: str | None) -> str | None:
 class INaturalistBot(BaseBot):
     redis_prefix = 'ZHXgxFHT4ZBJjR+fLxCH9quuLYl7ky4N6fNV/oC4fbs='
     summary = 'add [[Commons:Structured data|SDC]] based on metadata from iNaturalist'
+    # Cache for taxa-Wikidata item mappings
+    taxa_wikidata_map = {}
 
     def __init__(self, **kwargs: Any):
         super().__init__(**kwargs)
@@ -178,6 +180,12 @@ class INaturalistBot(BaseBot):
             taxa = observation['taxon']
 
         for taxa_id in reversed(taxa['ancestor_ids']):
+            # Check if taxa_id is already in the cache
+            if taxa_id in self.__class__.taxa_wikidata_map:
+                info(f'Using cached Wikidata item for taxa https://www.inaturalist.org/taxa/{taxa_id} - {self.__class__.taxa_wikidata_map[taxa_id].getID()}')
+                self.photo.depicts = self.__class__.taxa_wikidata_map[taxa_id]
+                break
+
             info(f'Searching Wikidata for taxon with ID {taxa_id}')
             gen = WikidataSPARQLPageGenerator(sparql_taxa_query.substitute(taxa=taxa_id), site=self.wikidata)
             items = list(gen)
@@ -192,6 +200,8 @@ class INaturalistBot(BaseBot):
 
             info(f'Found Wikidata item for taxa https://www.inaturalist.org/taxa/{taxa_id} - {items[0].getID()}')
 
+            # Store the mapping in the cache
+            self.__class__.taxa_wikidata_map[taxa_id] = items[0]
             self.photo.depicts = items[0]
             break
 
