@@ -52,7 +52,7 @@ class YouTubeBot(BaseBot):
         """
         super().__init__(**kwargs)
 
-        self.generator = SearchPageGenerator(f'file: incategory:"License review needed (video)" filemime:video hastemplate:"YouTube CC-BY" -haswbstatement:{WikidataProperty.YouTubeVideoId}', site=self.commons)
+        self.generator = SearchPageGenerator(f'file: filemime:video hastemplate:"YouTube CC-BY" -haswbstatement:{WikidataProperty.YouTubeVideoId}', site=self.commons)
 
         self.youtube = googleapiclient.discovery.build('youtube', 'v3', developerKey=os.getenv('YOUTUBE_API_KEY'))
         self.video: YouTubeVideo | None = None
