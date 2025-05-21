@@ -67,7 +67,12 @@ class BaseBot(ExistingPageBot):
         if os.getenv('TOOL_REDIS_URI'):
             self.redis = Redis.from_url(os.getenv('TOOL_REDIS_URI'), db=9)
         else:
-            self.redis = Redis(host='localhost', port=6379, db=9)
+            try:
+                self.redis = Redis(db=9)
+                self.redis.ping()
+            except Exception as e:
+                critical(e)
+                raise
 
         self.user_agent = f"{self.commons.username()} / Wikimedia Commons / {os.getenv('EMAIL')}"
         self.wiki_properties: WikiProperties | None = None
