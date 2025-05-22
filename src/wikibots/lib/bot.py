@@ -199,7 +199,7 @@ class BaseBot(ExistingPageBot):
 
         self.wiki_properties.new_claims.append(claim)
 
-    def create_published_in_claim(self, published_in: str, date_posted: datetime) -> None:
+    def create_published_in_claim(self, published_in: str, date_posted: datetime | None = None) -> None:
         assert self.wiki_properties
 
         if WikidataProperty.PublishedIn in self.wiki_properties.existing_claims:
@@ -208,11 +208,13 @@ class BaseBot(ExistingPageBot):
         claim = Claim(self.commons, WikidataProperty.PublishedIn)
         claim.setTarget(ItemPage(self.wikidata, published_in))
 
-        ts = Timestamp.fromISOformat(date_posted.isoformat())
+        # Only add date qualifier if date_posted is provided
+        if date_posted is not None:
+            ts = Timestamp.fromISOformat(date_posted.isoformat())
 
-        date_posted_qualifier = Claim(self.commons, WikidataProperty.PublicationDate)
-        date_posted_qualifier.setTarget(WbTime(ts.year, ts.month, ts.day, precision=WbTime.PRECISION['day']))
-        claim.addQualifier(date_posted_qualifier)
+            date_posted_qualifier = Claim(self.commons, WikidataProperty.PublicationDate)
+            date_posted_qualifier.setTarget(WbTime(ts.year, ts.month, ts.day, precision=WbTime.PRECISION['day']))
+            claim.addQualifier(date_posted_qualifier)
 
         self.wiki_properties.new_claims.append(claim)
 
