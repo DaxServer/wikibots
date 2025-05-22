@@ -2,6 +2,7 @@ import hashlib
 import os
 import re
 import sys
+from datetime import datetime
 from time import perf_counter
 from typing import Any
 
@@ -12,10 +13,10 @@ from pywikibot.pagegenerators import SearchPageGenerator
 try:
     sys.path.append(os.path.dirname(os.path.abspath(__file__)) + '/lib')
     from lib.bot import BaseBot
-    from lib.wikidata import WikidataProperty
+    from lib.wikidata import WikidataProperty, WikidataEntity
 except:
     from .lib.bot import BaseBot
-    from .lib.wikidata import WikidataProperty
+    from .lib.wikidata import WikidataProperty, WikidataEntity
 
 
 class PortableAntiquitiesSchemeBot(BaseBot):
@@ -56,14 +57,14 @@ class PortableAntiquitiesSchemeBot(BaseBot):
 
         start = perf_counter()
         try:
-            image = self.session.get(f'https://finds.org.uk/database/images/image/id/{image_id}/recordtype/artefacts/format/json', timeout=30).json()['image'][0]
+            image_json = self.session.get(f'https://finds.org.uk/database/images/image/id/{image_id}/recordtype/artefacts/format/json', timeout=30).json()['image'][0]
         except Exception as e:
             warning(f'Failed to fetch image: {e}')
             self.redis.set(self.wiki_properties.redis_key, 1)
             return
 
-        if image['id'] != image_id:
-            warning(f'Invalid image ID found: {image_id} != {image["id"]}')
+        if image_json['id'] != image_id:
+            warning(f'Invalid image ID found: {image_id} != {image_json["id"]}')
             self.redis.set(self.wiki_properties.redis_key, 1)
             return
 
@@ -88,6 +89,20 @@ class PortableAntiquitiesSchemeBot(BaseBot):
             return
 
         self.create_id_claim(WikidataProperty.PortableAntiquitiesSchemeImageID, image_id)
+
+        # Add Published in claim with date qualifier if available
+        date_obj = None
+
+        if 'created' in image_json and image_json['created']:
+            try:
+                date_obj = datetime.strptime(image_json['created'], '%Y-%m-%d %H:%M:%S')
+            except Exception as e:
+                warning(f'Failed to parse created date: {e}')
+        else:
+            warning('No created field found in API response')
+
+        self.create_published_in_claim(WikidataEntity.PortableAntiquitiesSchemeDatabase, date_obj)
+
         self.save()
 
     def find_matches(self, url: str) -> None:

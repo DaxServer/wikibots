@@ -5,6 +5,7 @@ class WikidataEntity:
     FileAvailableOnInternet = "Q74228490"
     Flickr = "Q103204"
     iNaturalist = "Q16958215"
+    PortableAntiquitiesSchemeDatabase = "Q111225724"
     PublicDomain = "Q19652"
     StatedByCopyrightHolderAtSourceWebsite = "Q61045577"
     USACE = 'Q1049334'
