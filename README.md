@@ -2,16 +2,18 @@
 
 ## Building
 
+`-L` flag uses the latest versions of the buildpacks, which is required to support poetry.
+
 For main branch:
 
 ```bash
-toolforge build start -i wikibots https://github.com/DaxServer/wikibots.git
+toolforge build start -L -i wikibots https://github.com/DaxServer/wikibots.git
 ```
 
 For a specific branch:
 
 ```bash
-toolforge build start -i wikibots-pr-10 https://github.com/DaxServer/wikibots.git --ref <BRANCH>
+toolforge build start -L -i wikibots-pr-10 https://github.com/DaxServer/wikibots.git --ref <BRANCH>
 ```
 
 ## Deploying

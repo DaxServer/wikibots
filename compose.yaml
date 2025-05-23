@@ -1,0 +1,22 @@
+services:
+  redis:
+    image: ghcr.io/dragonflydb/dragonfly:v1.30.1
+    volumes:
+      - redis:/data
+
+  pas:
+    image: tools-harbor.wmcloud.org/tool-curator/wikibots:latest
+    command: ["pas"]
+    environment:
+      PWB_CONSUMER_TOKEN: $CURATORBOT_PWB_CONSUMER_TOKEN
+      PWB_CONSUMER_SECRET: $CURATORBOT_PWB_CONSUMER_SECRET
+      PWB_ACCESS_TOKEN: $CURATORBOT_PWB_ACCESS_TOKEN
+      PWB_ACCESS_SECRET: $CURATORBOT_PWB_ACCESS_SECRET
+      PWB_USERNAME: $CURATORBOT_PWB_USERNAME
+      TOOL_REDIS_URI: "redis://redis"
+      EMAIL: $EMAIL
+    depends_on:
+      - redis
+
+volumes:
+  redis:

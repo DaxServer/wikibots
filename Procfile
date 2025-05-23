@@ -1,4 +1,4 @@
-flickr: python /workspace/src/wikibots/flickr.py
-inaturalist: python /workspace/src/wikibots/inaturalist.py
-pas: python /workspace/src/wikibots/pas.py
-youtube: python /workspace/src/wikibots/youtube.py
+flickr: python -m wikibots.flickr
+inaturalist: python -m wikibots.inaturalist
+pas: python -m wikibots.pas
+youtube: python -m wikibots.youtube
