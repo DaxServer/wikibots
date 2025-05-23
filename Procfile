@@ -1,1 +1,1 @@
-pas: pas
+pas: python -m wikibots.pas
