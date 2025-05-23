@@ -1,4 +1,4 @@
 flickr: poetry run flickr
 inaturalist: poetry run inaturalist
-pas: which python
+pas: echo $PATH
 youtube: poetry run youtube
