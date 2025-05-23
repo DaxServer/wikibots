@@ -5,7 +5,7 @@ services:
       - redis:/data
 
   pas:
-    image: wikibots:latest
+    image: tools-harbor.wmcloud.org/tool-curator/wikibots:latest
     command: ["pas"]
     environment:
       PWB_CONSUMER_TOKEN: $CURATORBOT_PWB_CONSUMER_TOKEN
