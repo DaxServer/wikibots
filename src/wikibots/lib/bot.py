@@ -1,5 +1,6 @@
 import json
 import os
+import sys
 from contextlib import suppress
 from dataclasses import dataclass, field
 from datetime import datetime
@@ -19,10 +20,7 @@ from pywikibot.page._collections import ClaimCollection
 from pywikibot.scripts.wrapper import pwb
 from redis import Redis
 
-try:
-    from wikidata import WikidataEntity, WikidataProperty
-except ImportError:
-    from wikibots.lib.wikidata import WikidataEntity, WikidataProperty
+from wikibots.lib.wikidata import WikidataProperty, WikidataEntity
 
 
 @dataclass
@@ -41,8 +39,7 @@ class BaseBot(ExistingPageBot):
     throttle = 10
 
     def __init__(self, **kwargs: Any):
-        # Extract 'dry' option before passing kwargs to parent
-        self.dry = kwargs.pop('dry', False)
+        self.dry_run = '--dry-run' in sys.argv
 
         super().__init__(**kwargs)
 
@@ -289,7 +286,7 @@ class BaseBot(ExistingPageBot):
 
         pprint(DeepDiff([], claims))
 
-        if self.dry:
+        if self.dry_run:
             info("Dry run mode: skipping save operation")
             self.quit()
 

@@ -1,7 +1,5 @@
-import os
 import re
 import string
-import sys
 from dataclasses import dataclass
 from typing import Any
 
@@ -9,13 +7,8 @@ from pywikibot import warning, info, Claim, ItemPage
 from pywikibot.page import BasePage
 from pywikibot.pagegenerators import SearchPageGenerator, WikidataSPARQLPageGenerator
 
-try:
-    sys.path.append(os.path.dirname(os.path.abspath(__file__)) + '/lib')
-    from lib.bot import BaseBot
-    from lib.wikidata import WikidataEntity, WikidataProperty
-except ImportError:
-    from .lib.bot import BaseBot
-    from .lib.wikidata import WikidataEntity, WikidataProperty
+from wikibots.lib.bot import BaseBot
+from wikibots.lib.wikidata import WikidataProperty, WikidataEntity
 
 sparql_taxa_query = string.Template(f'''
 SELECT DISTINCT ?item
@@ -257,8 +250,7 @@ class INaturalistBot(BaseBot):
 
 
 def main() -> None:
-    dry = '--dry' in sys.argv
-    INaturalistBot(dry=dry).run()
+    INaturalistBot().run()
 
 
 if __name__ == "__main__":
