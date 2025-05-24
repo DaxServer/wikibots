@@ -8,6 +8,7 @@ services:
 
   pas:
     image: tools-harbor.wmcloud.org/tool-curator/wikibots:latest
+    pull_policy: always
     command: ["pas"]
     environment:
       PWB_CONSUMER_TOKEN: $CURATORBOT_PWB_CONSUMER_TOKEN
