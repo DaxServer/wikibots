@@ -1,7 +1,5 @@
 import hashlib
-import os
 import re
-import sys
 from datetime import datetime
 from time import perf_counter
 from typing import Any
@@ -10,13 +8,8 @@ from mwparserfromhell.nodes import ExternalLink
 from pywikibot import warning, info
 from pywikibot.pagegenerators import SearchPageGenerator
 
-try:
-    sys.path.append(os.path.dirname(os.path.abspath(__file__)) + '/lib')
-    from lib.bot import BaseBot
-    from lib.wikidata import WikidataProperty, WikidataEntity
-except:
-    from .lib.bot import BaseBot
-    from .lib.wikidata import WikidataProperty, WikidataEntity
+from wikibots.lib.bot import BaseBot
+from wikibots.lib.wikidata import WikidataProperty, WikidataEntity
 
 
 class PortableAntiquitiesSchemeBot(BaseBot):
@@ -117,8 +110,7 @@ class PortableAntiquitiesSchemeBot(BaseBot):
 
 
 def main():
-    dry = '--dry' in sys.argv
-    PortableAntiquitiesSchemeBot(dry=dry).run()
+    PortableAntiquitiesSchemeBot().run()
 
 
 if __name__ == "__main__":

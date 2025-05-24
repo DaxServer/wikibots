@@ -1,5 +1,4 @@
 import os
-import sys
 import time
 from time import perf_counter
 from typing import Any
@@ -12,13 +11,8 @@ from flickr_url_parser import parse_flickr_url
 from pywikibot import Claim, info, warning, error, Coordinate, WbTime
 from pywikibot.pagegenerators import SearchPageGenerator
 
-try:
-    sys.path.append(os.path.dirname(os.path.abspath(__file__)) + '/lib')
-    from lib.bot import BaseBot
-    from lib.wikidata import WikidataEntity, WikidataProperty
-except:
-    from .lib.bot import BaseBot
-    from .lib.wikidata import WikidataEntity, WikidataProperty
+from wikibots.lib.bot import BaseBot
+from wikibots.lib.wikidata import WikidataProperty, WikidataEntity
 
 
 class FlickrBot(BaseBot):
@@ -260,8 +254,7 @@ class FlickrBot(BaseBot):
 
 
 def main() -> None:
-    dry = '--dry' in sys.argv
-    FlickrBot(dry=dry).run()
+    FlickrBot().run()
 
 
 if __name__ == "__main__":
