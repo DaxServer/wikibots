@@ -174,14 +174,14 @@ test = ["pytest (>=8.3.0,<8.4.0)", "pytest-benchmark (>=5.1.0,<5.2.0)", "pytest-
 
 [[package]]
 name = "flickr-photos-api"
-version = "2.21.0"
+version = "3.8.1"
 description = "Look up information about photos and collections of photos from Flickr"
 optional = false
 python-versions = ">=3.12"
 groups = ["main"]
 files = [
-    {file = "flickr_photos_api-2.21.0-py3-none-any.whl", hash = "sha256:0748232a6a6ecb2e19b636aba6f45fa80b9d366baf136dc81e127c833b5fecc9"},
-    {file = "flickr_photos_api-2.21.0.tar.gz", hash = "sha256:37008e9c06dd70aa24c5985cde683d8917b9370f656dddc62250fcc3595fa1bb"},
+    {file = "flickr_photos_api-3.8.1-py3-none-any.whl", hash = "sha256:74d04ecdd5c47a18d8199dae770cd304800b7d7c238d6d51376d1c6be27676c7"},
+    {file = "flickr_photos_api-3.8.1.tar.gz", hash = "sha256:5e99b403f8fc6676eca29725da264833b05ced004150c783a513a4d82fdf6db3"},
 ]
 
 [package.dependencies]
@@ -823,4 +823,4 @@ zstd = ["zstandard (>=0.18.0)"]
 [metadata]
 lock-version = "2.1"
 python-versions = ">=3.12,<4.0"
-content-hash = "cea58be32d2d85675daee4454e60c038042f253fc3399a794093c3058db62b56"
+content-hash = "f788e2d78c26666f5b9441d8536f4620287e7790893de0790883b3c61d3714d7"

@@ -4,7 +4,10 @@ import time
 from time import perf_counter
 from typing import Any
 
-from flickr_photos_api import FlickrApi, PhotoIsPrivate, ResourceNotFound, SinglePhoto, LocationInfo
+from flickr_api import FlickrApi
+from flickr_api.exceptions import PhotoIsPrivate, ResourceNotFound
+from flickr_api.models import SinglePhotoInfo
+from flickr_api.models.photo import Location
 from flickr_url_parser import parse_flickr_url
 from pywikibot import Claim, info, warning, error, Coordinate, WbTime
 from pywikibot.pagegenerators import SearchPageGenerator
@@ -28,7 +31,7 @@ class FlickrBot(BaseBot):
         self.generator = SearchPageGenerator(f'file: incategory:"Flickr images reviewed by FlickreviewR 2" -haswbstatement:{WikidataProperty.FlickrPhotoId} hastemplate:"FlickreviewR"', site=self.commons)
 
         self.flickr_api = FlickrApi.with_api_key(api_key=os.getenv("FLICKR_API_KEY"), user_agent=self.user_agent)
-        self.photo: SinglePhoto | None = None
+        self.photo: SinglePhotoInfo | None = None
 
     def treat_page(self) -> None:
         # Reset
@@ -134,7 +137,7 @@ class FlickrBot(BaseBot):
 
         self.create_inception_claim(WbTime(year, month, day, precision=precision), granularity)
 
-    def create_location_claim(self, location: LocationInfo | None) -> None:
+    def create_location_claim(self, location: Location | None) -> None:
         assert self.wiki_properties
 
         if WikidataProperty.CoordinatesOfThePointOfView in self.wiki_properties.existing_claims:
