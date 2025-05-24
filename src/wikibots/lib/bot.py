@@ -291,7 +291,7 @@ class BaseBot(ExistingPageBot):
 
         if self.dry:
             info("Dry run mode: skipping save operation")
-            self.exit()
+            self.quit()
 
         payload = {
             "action": "wbeditentity",
