@@ -35,14 +35,14 @@ files = [
 
 [[package]]
 name = "certifi"
-version = "2025.4.26"
+version = "2025.6.15"
 description = "Python package for providing Mozilla's CA Bundle."
 optional = false
-python-versions = ">=3.6"
+python-versions = ">=3.7"
 groups = ["main"]
 files = [
-    {file = "certifi-2025.4.26-py3-none-any.whl", hash = "sha256:30350364dfe371162649852c63336a15c70c6510c2ad5015b21c2345311805f3"},
-    {file = "certifi-2025.4.26.tar.gz", hash = "sha256:0a816057ea3cdefcef70270d2c515e4506bbc954f417fa5ade2021213bb8f0c6"},
+    {file = "certifi-2025.6.15-py3-none-any.whl", hash = "sha256:2e0c7ce7cb5d8f8634ca55d2ba7e6ec2689a2fd6537d8dec1296a477a4910057"},
+    {file = "certifi-2025.6.15.tar.gz", hash = "sha256:d747aa5a8b9bbbb1bb8c22bb13e22bd1f18e9796defa16bab421f7f7a317323b"},
 ]
 
 [[package]]
@@ -173,14 +173,14 @@ test = ["pytest (>=8.3.0,<8.4.0)", "pytest-benchmark (>=5.1.0,<5.2.0)", "pytest-
 
 [[package]]
 name = "flickr-photos-api"
-version = "3.8.4"
+version = "3.11.1"
 description = "Look up information about photos and collections of photos from Flickr"
 optional = false
 python-versions = ">=3.12"
 groups = ["main"]
 files = [
-    {file = "flickr_photos_api-3.8.4-py3-none-any.whl", hash = "sha256:8988360a7736617ea375d978a06ed82a610cc0cde6f20f9bba22bd434c22a974"},
-    {file = "flickr_photos_api-3.8.4.tar.gz", hash = "sha256:2d265c504256d2dba6cf7d0bdc3976da3be0ad8773c94e99b7b8a6dd9d3a837b"},
+    {file = "flickr_photos_api-3.11.1-py3-none-any.whl", hash = "sha256:2547da5bd62d853c0dc171b9a6e2f0dc9c20c32268ca8c83a6a005ce0e894909"},
+    {file = "flickr_photos_api-3.11.1.tar.gz", hash = "sha256:202977c8d9e45bcccf68a0d68c756be5db35798c204b6019119a1b91104ed31a"},
 ]
 
 [package.dependencies]
@@ -190,6 +190,7 @@ silver-nitrate = {version = ">=1.5.0", extras = ["xml"]}
 tenacity = "*"
 
 [package.extras]
+fixtures = ["silver-nitrate[cassettes]"]
 oauth = ["authlib"]
 
 [[package]]
@@ -210,14 +211,14 @@ hyperlink = "*"
 
 [[package]]
 name = "google-api-core"
-version = "2.25.0"
+version = "2.25.1"
 description = "Google API client core library"
 optional = false
 python-versions = ">=3.7"
 groups = ["main"]
 files = [
-    {file = "google_api_core-2.25.0-py3-none-any.whl", hash = "sha256:1db79d1281dcf9f3d10023283299ba38f3dc9f639ec41085968fd23e5bcf512e"},
-    {file = "google_api_core-2.25.0.tar.gz", hash = "sha256:9b548e688702f82a34ed8409fb8a6961166f0b7795032f0be8f48308dff4333a"},
+    {file = "google_api_core-2.25.1-py3-none-any.whl", hash = "sha256:8a2a56c1fef82987a524371f99f3bd0143702fecc670c72e600c1cda6bf8dbb7"},
+    {file = "google_api_core-2.25.1.tar.gz", hash = "sha256:d2aaa0b13c78c61cb3f4282c464c046e45fbd75755683c9c525e6e8f7ed0a5e8"},
 ]
 
 [package.dependencies]
@@ -235,14 +236,14 @@ grpcio-gcp = ["grpcio-gcp (>=0.2.2,<1.0.0)"]
 
 [[package]]
 name = "google-api-python-client"
-version = "2.172.0"
+version = "2.173.0"
 description = "Google API Client Library for Python"
 optional = false
 python-versions = ">=3.7"
 groups = ["main"]
 files = [
-    {file = "google_api_python_client-2.172.0-py3-none-any.whl", hash = "sha256:9f1b9a268d5dc1228207d246c673d3a09ee211b41a11521d38d9212aeaa43af7"},
-    {file = "google_api_python_client-2.172.0.tar.gz", hash = "sha256:dcb3b7e067154b2aa41f1776cf86584a5739c0ac74e6ff46fc665790dca0e6a6"},
+    {file = "google_api_python_client-2.173.0-py3-none-any.whl", hash = "sha256:16a8e81c772dd116f5c4ee47d83643149e1367dc8fb4f47cb471fbcb5c7d7ac7"},
+    {file = "google_api_python_client-2.173.0.tar.gz", hash = "sha256:b537bc689758f4be3e6f40d59a6c0cd305abafdea91af4bc66ec31d40c08c804"},
 ]
 
 [package.dependencies]
@@ -455,14 +456,14 @@ files = [
 
 [[package]]
 name = "oauthlib"
-version = "3.2.2"
+version = "3.3.1"
 description = "A generic, spec-compliant, thorough implementation of the OAuth request-signing logic"
 optional = false
-python-versions = ">=3.6"
+python-versions = ">=3.8"
 groups = ["main"]
 files = [
-    {file = "oauthlib-3.2.2-py3-none-any.whl", hash = "sha256:8139f29aac13e25d502680e9e19963e83f16838d48a0d71c287fe40e7067fbca"},
-    {file = "oauthlib-3.2.2.tar.gz", hash = "sha256:9859c40929662bec5d64f34d01c99e093149682a3f38915dc0655d5a633dd918"},
+    {file = "oauthlib-3.3.1-py3-none-any.whl", hash = "sha256:88119c938d2b8fb88561af5f6ee0eec8cc8d552b7bb1f712743136eb7523b7a1"},
+    {file = "oauthlib-3.3.1.tar.gz", hash = "sha256:0f0f8aa759826a193cf66c12ea1af1637f87b9b4622d46e866952bb022e538c9"},
 ]
 
 [package.extras]
@@ -608,14 +609,14 @@ six = ">=1.5"
 
 [[package]]
 name = "pywikibot"
-version = "10.1.0"
+version = "10.2.0"
 description = "Python MediaWiki Bot Framework"
 optional = false
 python-versions = ">=3.8.0"
 groups = ["main"]
 files = [
-    {file = "pywikibot-10.1.0-py3-none-any.whl", hash = "sha256:dcaaa4d2252bd3e975a8e9a09790c5cc4650ffe772caa4a829f98bb154b463ae"},
-    {file = "pywikibot-10.1.0.tar.gz", hash = "sha256:764550ab6062ca7567ebf1af146d82112944cf8eab0da5699195a8cc78fb70ed"},
+    {file = "pywikibot-10.2.0-py3-none-any.whl", hash = "sha256:67c509f5cd177b34dd3448b01266d6eda1254725ddaab76345edcbfea0590678"},
+    {file = "pywikibot-10.2.0.tar.gz", hash = "sha256:a705c5d8981c2baac0d58350d95435b2f043b1cf31b775f1dbea345ebf9c3993"},
 ]
 
 [package.dependencies]
@@ -787,14 +788,14 @@ files = [
 
 [[package]]
 name = "urllib3"
-version = "2.4.0"
+version = "2.5.0"
 description = "HTTP library with thread-safe connection pooling, file post, and more."
 optional = false
 python-versions = ">=3.9"
 groups = ["main"]
 files = [
-    {file = "urllib3-2.4.0-py3-none-any.whl", hash = "sha256:4e16665048960a0900c702d4a66415956a584919c03361cac9f1df5c5dd7e813"},
-    {file = "urllib3-2.4.0.tar.gz", hash = "sha256:414bc6535b787febd7567804cc015fee39daab8ad86268f1310a9250697de466"},
+    {file = "urllib3-2.5.0-py3-none-any.whl", hash = "sha256:e6b01673c0fa6a13e374b50871808eb3bf7046c4b125b216f6bf1cc604cff0dc"},
+    {file = "urllib3-2.5.0.tar.gz", hash = "sha256:3fc47733c7e419d4bc3f6b3dc2b4f890bb743906a30d56ba4a5bfa4bbff92760"},
 ]
 
 [package.extras]

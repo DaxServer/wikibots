@@ -1,6 +1,6 @@
 services:
   redis:
-    image: ghcr.io/dragonflydb/dragonfly:v1.30.3
+    image: ghcr.io/dragonflydb/dragonfly:v1.31.0
     ports:
       - "6379:6379"
     volumes:
