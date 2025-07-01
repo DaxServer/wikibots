@@ -20,6 +20,9 @@ dependencies = [
 [tool.poetry]
 packages = [{include = "wikibots", from = "src"}]
 
+[tool.poetry.group.dev.dependencies]
+black = "^25.1.0"
+
 [project.scripts]
 flickr = "wikibots.flickr:main"
 inaturalist = "wikibots.inaturalist:main"

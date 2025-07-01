@@ -8,9 +8,9 @@ class WikidataEntity:
     PortableAntiquitiesSchemeDatabase = "Q111225724"
     PublicDomain = "Q19652"
     StatedByCopyrightHolderAtSourceWebsite = "Q61045577"
-    USACE = 'Q1049334'
+    USACE = "Q1049334"
     WorkOfTheFederalGovernmentOfTheUnitedStates = "Q60671452"
-    YouTube = 'Q866'
+    YouTube = "Q866"
 
 
 class WikidataProperty:
