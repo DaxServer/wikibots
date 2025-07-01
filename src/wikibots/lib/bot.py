@@ -34,22 +34,26 @@ class WikiProperties:
 
 
 class BaseBot(ExistingPageBot):
-    summary = 'add [[Commons:Structured data|SDC]] based on metadata'
-    redis_prefix = ''
+    summary = "add [[Commons:Structured data|SDC]] based on metadata"
+    redis_prefix = ""
     throttle = 10
 
     def __init__(self, **kwargs: Any):
-        self.dry_run = '--dry-run' in sys.argv
+        self.dry_run = "--dry-run" in sys.argv
 
         super().__init__(**kwargs)
 
-        if os.getenv('PWB_CONSUMER_TOKEN') and os.getenv('PWB_CONSUMER_SECRET') and os.getenv(
-                'PWB_ACCESS_TOKEN') and os.getenv('PWB_ACCESS_SECRET'):
+        if (
+            os.getenv("PWB_CONSUMER_TOKEN")
+            and os.getenv("PWB_CONSUMER_SECRET")
+            and os.getenv("PWB_ACCESS_TOKEN")
+            and os.getenv("PWB_ACCESS_SECRET")
+        ):
             authenticate = (
-                os.getenv('PWB_CONSUMER_TOKEN'),
-                os.getenv('PWB_CONSUMER_SECRET'),
-                os.getenv('PWB_ACCESS_TOKEN'),
-                os.getenv('PWB_ACCESS_SECRET'),
+                os.getenv("PWB_CONSUMER_TOKEN"),
+                os.getenv("PWB_CONSUMER_SECRET"),
+                os.getenv("PWB_ACCESS_TOKEN"),
+                os.getenv("PWB_ACCESS_SECRET"),
             )
             pwb.config.authenticate["commons.wikimedia.org"] = authenticate
         else:
@@ -61,8 +65,8 @@ class BaseBot(ExistingPageBot):
         self.commons = Site("commons", "commons", user=os.getenv("PWB_USERNAME"))
         self.commons.login()
 
-        if os.getenv('TOOL_REDIS_URI'):
-            self.redis = Redis.from_url(os.getenv('TOOL_REDIS_URI'), db=9)
+        if os.getenv("TOOL_REDIS_URI"):
+            self.redis = Redis.from_url(os.getenv("TOOL_REDIS_URI"), db=9)
         else:
             try:
                 self.redis = Redis(db=9)
@@ -71,21 +75,23 @@ class BaseBot(ExistingPageBot):
                 critical(e)
                 raise
 
-        self.user_agent = f"{self.commons.username()} / Wikimedia Commons / {os.getenv('EMAIL')}"
+        self.user_agent = (
+            f"{self.commons.username()} / Wikimedia Commons / {os.getenv('EMAIL')}"
+        )
         self.wiki_properties: WikiProperties | None = None
 
         # Initialize a session for HTTP requests
         self.session = requests.Session()
-        self.session.headers.update({'User-Agent': self.user_agent})
+        self.session.headers.update({"User-Agent": self.user_agent})
 
     def skip_page(self, page: BasePage) -> bool:
-        return self.redis.exists(f'{self.redis_prefix}:commons:M{page.pageid}')
+        return self.redis.exists(f"{self.redis_prefix}:commons:M{page.pageid}")
 
     def treat_page(self) -> None:
-        mid = f'M{self.current_page.pageid}'
+        mid = f"M{self.current_page.pageid}"
         self.wiki_properties = WikiProperties(
             mid=mid,
-            redis_key=f'{self.redis_prefix}:commons:{mid}',
+            redis_key=f"{self.redis_prefix}:commons:{mid}",
             existing_claims=ClaimCollection(repo=self.commons),
         )
 
@@ -95,24 +101,41 @@ class BaseBot(ExistingPageBot):
     def fetch_claims(self) -> None:
         assert self.wiki_properties
 
-        request: Request = self.commons.simple_request(action="wbgetentities", ids=self.wiki_properties.mid)
-        statements = request.submit().get('entities').get(self.wiki_properties.mid).get('statements', [])
+        request: Request = self.commons.simple_request(
+            action="wbgetentities", ids=self.wiki_properties.mid
+        )
+        statements = (
+            request.submit()
+            .get("entities")
+            .get(self.wiki_properties.mid)
+            .get("statements", [])
+        )
 
-        self.wiki_properties.existing_claims = ClaimCollection.fromJSON(data=statements, repo=self.commons)
+        self.wiki_properties.existing_claims = ClaimCollection.fromJSON(
+            data=statements, repo=self.commons
+        )
 
     def parse_wikicode(self) -> None:
         assert self.wiki_properties
 
         if self.wiki_properties.wikicode is None:
-            self.wiki_properties.wikicode = mwparserfromhell.parse(self.current_page.text)
+            self.wiki_properties.wikicode = mwparserfromhell.parse(
+                self.current_page.text
+            )
 
-    def retrieve_template_data(self, templates: list[str], parameters: list[str]) -> str | None:
+    def retrieve_template_data(
+        self, templates: list[str], parameters: list[str]
+    ) -> str | None:
         assert self.wiki_properties
         self.parse_wikicode()
 
-        _templates = [w for w in self.wiki_properties.wikicode.filter_templates() if w.name.strip() in templates]
+        _templates = [
+            w
+            for w in self.wiki_properties.wikicode.filter_templates()
+            if w.name.strip() in templates
+        ]
         if not _templates:
-            warning(f'No match template found for {templates}')
+            warning(f"No match template found for {templates}")
             self.redis.set(self.wiki_properties.redis_key, 1)
             return None
 
@@ -120,16 +143,18 @@ class BaseBot(ExistingPageBot):
         for param in parameters:
             if t.has(param):
                 data = str(t.get(param).value).strip()
-                info(f'{t.name.strip()} has {param}: {data}')
+                info(f"{t.name.strip()} has {param}: {data}")
 
                 return data
 
-        warning(f'{t.name.strip()} template is missing parameters: {parameters}')
+        warning(f"{t.name.strip()} template is missing parameters: {parameters}")
         self.redis.set(self.wiki_properties.redis_key, 1)
 
         return None
 
-    def create_creator_claim(self, author_name_string: str | None = None, url: str | None = None) -> None:
+    def create_creator_claim(
+        self, author_name_string: str | None = None, url: str | None = None
+    ) -> None:
         assert self.wiki_properties
 
         if WikidataProperty.Creator in self.wiki_properties.existing_claims:
@@ -158,7 +183,10 @@ class BaseBot(ExistingPageBot):
     def create_depicts_claim(self, depicts: ItemPage | None) -> None:
         assert self.wiki_properties
 
-        if WikidataProperty.Depicts in self.wiki_properties.existing_claims or depicts is None:
+        if (
+            WikidataProperty.Depicts in self.wiki_properties.existing_claims
+            or depicts is None
+        ):
             return
 
         claim = Claim(self.commons, WikidataProperty.Depicts)
@@ -189,14 +217,18 @@ class BaseBot(ExistingPageBot):
         claim = Claim(self.commons, WikidataProperty.Inception)
         claim.setTarget(wbtime)
 
-        if granularity == 'circa':
-            circa_qualifier = Claim(self.commons, WikidataProperty.SourcingCircumstances)
+        if granularity == "circa":
+            circa_qualifier = Claim(
+                self.commons, WikidataProperty.SourcingCircumstances
+            )
             circa_qualifier.setTarget(ItemPage(self.wikidata, WikidataEntity.Circa))
             claim.addQualifier(circa_qualifier)
 
         self.wiki_properties.new_claims.append(claim)
 
-    def create_published_in_claim(self, published_in: str, date_posted: datetime | None = None) -> None:
+    def create_published_in_claim(
+        self, published_in: str, date_posted: datetime | None = None
+    ) -> None:
         assert self.wiki_properties
 
         if WikidataProperty.PublishedIn in self.wiki_properties.existing_claims:
@@ -209,8 +241,12 @@ class BaseBot(ExistingPageBot):
         if date_posted is not None:
             ts = Timestamp.fromISOformat(date_posted.isoformat())
 
-            date_posted_qualifier = Claim(self.commons, WikidataProperty.PublicationDate)
-            date_posted_qualifier.setTarget(WbTime(ts.year, ts.month, ts.day, precision=WbTime.PRECISION['day']))
+            date_posted_qualifier = Claim(
+                self.commons, WikidataProperty.PublicationDate
+            )
+            date_posted_qualifier.setTarget(
+                WbTime(ts.year, ts.month, ts.day, precision=WbTime.PRECISION["day"])
+            )
             claim.addQualifier(date_posted_qualifier)
 
         self.wiki_properties.new_claims.append(claim)
@@ -224,7 +260,9 @@ class BaseBot(ExistingPageBot):
         claim = Claim(self.commons, WikidataProperty.SourceOfFile)
         claim.setTarget(ItemPage(self.wikidata, WikidataEntity.FileAvailableOnInternet))
 
-        described_at_url_qualifier = Claim(self.commons, WikidataProperty.DescribedAtUrl)
+        described_at_url_qualifier = Claim(
+            self.commons, WikidataProperty.DescribedAtUrl
+        )
         described_at_url_qualifier.setTarget(source)
         claim.addQualifier(described_at_url_qualifier)
 
@@ -242,7 +280,7 @@ class BaseBot(ExistingPageBot):
         pass
 
     def hook_creator_target(self, claim: Claim) -> None:
-        claim.setSnakType('somevalue')
+        claim.setSnakType("somevalue")
 
     def hook_depicts_claim(self, claim: Claim) -> None:
         pass
@@ -269,11 +307,13 @@ class BaseBot(ExistingPageBot):
             start = perf_counter()
             response = self.commons.simple_request(**payload).submit()
             info(f"Queried Wiki file hash in {(perf_counter() - start) * 1000:.1f} ms")
-            self.wiki_properties.hash = response['query']['pages'][0]['imageinfo'][0]['sha1']
+            self.wiki_properties.hash = response["query"]["pages"][0]["imageinfo"][0][
+                "sha1"
+            ]
         except Exception as e:
             critical(f"Failed to get file hash: {e}")
 
-        return self.wiki_properties.hash or ''
+        return self.wiki_properties.hash or ""
 
     def save(self) -> None:
         assert self.wiki_properties
@@ -294,7 +334,7 @@ class BaseBot(ExistingPageBot):
             "action": "wbeditentity",
             "id": self.wiki_properties.mid,
             "data": json.dumps({"claims": claims}),
-            "token": self.commons.get_tokens("csrf")['csrf'],
+            "token": self.commons.get_tokens("csrf")["csrf"],
             "summary": self.summary,
             "tags": "BotSDC",
             "bot": True,
@@ -304,7 +344,9 @@ class BaseBot(ExistingPageBot):
         try:
             start = perf_counter()
             request.submit()
-            info(f"Updating {self.wiki_properties.mid} took {(perf_counter() - start):.1f} s")
+            info(
+                f"Updating {self.wiki_properties.mid} took {(perf_counter() - start):.1f} s"
+            )
         except Exception as e:
             critical(f"Failed to update: {e}")
 
