@@ -66,7 +66,7 @@ class BaseBot(ExistingPageBot):
         self.commons.login()
 
         if os.getenv("TOOL_REDIS_URI"):
-            self.redis = Redis.from_url(os.getenv("TOOL_REDIS_URI"), db=9)
+            self.redis = Redis.from_url(os.getenv("TOOL_REDIS_URI", ""), db=9)
         else:
             try:
                 self.redis = Redis(db=9)
@@ -85,7 +85,7 @@ class BaseBot(ExistingPageBot):
         self.session.headers.update({"User-Agent": self.user_agent})
 
     def skip_page(self, page: BasePage) -> bool:
-        return self.redis.exists(f"{self.redis_prefix}:commons:M{page.pageid}")
+        return bool(self.redis.exists(f"{self.redis_prefix}:commons:M{page.pageid}"))
 
     def treat_page(self) -> None:
         mid = f"M{self.current_page.pageid}"
@@ -106,8 +106,8 @@ class BaseBot(ExistingPageBot):
         )
         statements = (
             request.submit()
-            .get("entities")
-            .get(self.wiki_properties.mid)
+            .get("entities", {})
+            .get(self.wiki_properties.mid, {})
             .get("statements", [])
         )
 
@@ -128,6 +128,7 @@ class BaseBot(ExistingPageBot):
     ) -> str | None:
         assert self.wiki_properties
         self.parse_wikicode()
+        assert self.wiki_properties.wikicode
 
         _templates = [
             w
@@ -237,7 +238,6 @@ class BaseBot(ExistingPageBot):
         claim = Claim(self.commons, WikidataProperty.PublishedIn)
         claim.setTarget(ItemPage(self.wikidata, published_in))
 
-        # Only add date qualifier if date_posted is provided
         if date_posted is not None:
             ts = Timestamp.fromISOformat(date_posted.isoformat())
 

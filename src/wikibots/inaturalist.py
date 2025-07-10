@@ -87,7 +87,7 @@ class INaturalistBot(BaseBot):
         redis_key = f"{self.redis_prefix}:commons:M{page.pageid}"
 
         return (
-            self.redis.exists(redis_key)
+            bool(self.redis.exists(redis_key))
             or self.commons.username() in page.contributors()
         )
 
@@ -96,6 +96,7 @@ class INaturalistBot(BaseBot):
         self.photo = None
 
         super().treat_page()
+        assert self.wiki_properties
 
         status = self.retrieve_template_data(
             ["iNaturalistReview", "iNaturalistreview"], ["status"]
