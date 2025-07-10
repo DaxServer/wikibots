@@ -3,8 +3,11 @@ name: Black Formatter Check
 on:
   pull_request:
 
+permissions:
+  contents: read
+
 jobs:
-  check_formatting:
+  format-check:
     runs-on: ubuntu-latest
 
     steps:
@@ -20,7 +23,7 @@ jobs:
           cache: 'poetry'
 
       - name: Install dependencies
-        run: poetry install --no-root --with dev # Install only dev dependencies for checking
+        run: poetry install --no-root --with dev
 
       - name: Run Black
         run: poetry run black --check .

@@ -37,7 +37,7 @@ class PortableAntiquitiesSchemeBot(BaseBot):
 
         self.image_id.clear()
         self.parse_wikicode()
-        
+
         assert self.wiki_properties.wikicode
 
         links: list[ExternalLink] = (
