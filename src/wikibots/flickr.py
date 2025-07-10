@@ -4,7 +4,7 @@ from time import perf_counter
 from typing import Any
 
 from flickr_api import FlickrApi
-from flickr_api.exceptions import PhotoIsPrivate, ResourceNotFound
+from flickr_api.exceptions import ResourceNotFound
 from flickr_api.models import SinglePhotoInfo
 from flickr_api.models.photo import Location
 from flickr_url_parser import parse_flickr_url
@@ -28,7 +28,7 @@ class FlickrBot(BaseBot):
         )
 
         self.flickr_api = FlickrApi.with_api_key(
-            api_key=os.getenv("FLICKR_API_KEY"), user_agent=self.user_agent
+            api_key=os.getenv("FLICKR_API_KEY", ""), user_agent=self.user_agent
         )
         self.photo: SinglePhotoInfo | None = None
 
@@ -84,13 +84,13 @@ class FlickrBot(BaseBot):
 
         info(flickr_id)
 
-        if flickr_id.get("type") != "single_photo":
+        if flickr_id.get("type") != "single_photo" or flickr_id.get("photo_id") is None:
             error("Skipping as it is not a single photo in Flickr")
             info(flickr_id)
             self.redis.set(self.wiki_properties.redis_key, 1)
             return None
 
-        return flickr_id["photo_id"]
+        return flickr_id.get("photo_id")
 
     def get_flickr_photo(self, flickr_photo_id: str) -> None:
         redis_key_photo = f"{self.redis_prefix}:{flickr_photo_id}:photo"
@@ -104,7 +104,7 @@ class FlickrBot(BaseBot):
             start = perf_counter()
             self.photo = self.flickr_api.get_single_photo_info(photo_id=flickr_photo_id)
             info(f"Retrieved Flickr photo in {(perf_counter() - start) * 1000:.0f} ms")
-        except (PhotoIsPrivate, ResourceNotFound) as e:
+        except ResourceNotFound as e:
             warning(f"[{flickr_photo_id}] {e}")
             self.redis.set(redis_key_photo, 1)
         except Exception as e:
@@ -119,6 +119,8 @@ class FlickrBot(BaseBot):
         claim.addQualifier(flickr_user_id_qualifier)
 
     def _create_inception_claim(self):
+        assert self.photo
+
         if self.photo["date_taken"] is None:
             return
 

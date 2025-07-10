@@ -1,12 +1,13 @@
 import os
 from dataclasses import dataclass
+from datetime import datetime
 from time import perf_counter
 from typing import Any
 
 import googleapiclient.discovery
 from dateutil.parser import isoparse
 from googleapiclient.errors import HttpError
-from pywikibot import Claim, ItemPage, info, Timestamp, WbTime, warning
+from pywikibot import Claim, ItemPage, info, warning
 from pywikibot.pagegenerators import SearchPageGenerator
 
 from wikibots.lib.bot import BaseBot
@@ -24,7 +25,7 @@ class YouTubeChannel:
 class YouTubeVideo:
     channel: YouTubeChannel
     id: str
-    published_at: str
+    published_at: datetime
     title: str
 
 
@@ -88,7 +89,9 @@ class YouTubeBot(BaseBot):
             self.save()
             return
 
-        self.create_published_in_claim(self.video.published_at)
+        assert self.video
+
+        self.create_published_in_claim(WikidataEntity.YouTube, self.video.published_at)
         self.create_creator_claim(self.video.channel.title)
         self.create_source_claim(f"https://www.youtube.com/watch?v={youtube_id}")
 
@@ -116,7 +119,7 @@ class YouTubeBot(BaseBot):
         video_title = video["items"][0]["snippet"]["localized"]["title"].strip()
         info(f"Video title: {video_title}")
 
-        published_at = video["items"][0]["snippet"]["publishedAt"].strip()
+        published_at = isoparse(video["items"][0]["snippet"]["publishedAt"].strip())
         info(published_at)
 
         channel_id = video["items"][0]["snippet"]["channelId"].strip()
@@ -148,39 +151,6 @@ class YouTubeBot(BaseBot):
         self.video = YouTubeVideo(
             id=youtube_id, channel=ytc, published_at=published_at, title=video_title
         )
-
-    def create_published_in_claim(self, date: str) -> None:
-        """
-        Creates a published-in claim with a publication date qualifier.
-
-        If a PublishedIn claim already exists, no claim is created. Otherwise, this
-        method constructs a new claim linking the video to YouTube and adds a qualifier
-        for the publication date (normalized to day precision from the provided ISO date
-        string). The new claim is then added in JSON format to the list of pending claims.
-
-        :param str date: The video's publication date in ISO format
-        :rtype: None
-        """
-        assert self.wiki_properties
-
-        if WikidataProperty.PublishedIn in self.wiki_properties.existing_claims:
-            return
-
-        claim = Claim(self.commons, WikidataProperty.PublishedIn)
-        claim.setTarget(ItemPage(self.wikidata, WikidataEntity.YouTube))
-
-        wb_ts = WbTime.fromTimestamp(
-            Timestamp.fromISOformat(
-                isoparse(date).replace(hour=0, minute=0, second=0).isoformat()
-            ),
-            WbTime.PRECISION["day"],
-        )
-
-        published_date_qualifier = Claim(self.commons, WikidataProperty.PublicationDate)
-        published_date_qualifier.setTarget(wb_ts)
-        claim.addQualifier(published_date_qualifier)
-
-        self.wiki_properties.new_claims.append(claim)
 
     def hook_creator_claim(self, claim: Claim) -> None:
         assert self.video

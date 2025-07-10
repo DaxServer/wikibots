@@ -33,6 +33,8 @@ class PortableAntiquitiesSchemeBot(BaseBot):
 
     def treat_page(self) -> None:
         super().treat_page()
+        assert self.wiki_properties
+
         self.image_id.clear()
         self.parse_wikicode()
 
