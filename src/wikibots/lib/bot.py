@@ -36,8 +36,7 @@ class WikiProperties:
 class BaseBot(ExistingPageBot):
     summary = "add [[Commons:Structured data|SDC]] based on metadata"
     redis_prefix = ""
-    throttle = 10
-    null_edit = True
+    throttle = 5
 
     def __init__(self, **kwargs: Any):
         self.dry_run = "--dry-run" in sys.argv
@@ -87,21 +86,6 @@ class BaseBot(ExistingPageBot):
 
     def skip_page(self, page: BasePage) -> bool:
         return bool(self.redis.exists(f"{self.redis_prefix}:commons:M{page.pageid}"))
-
-    def treat(self, page) -> None:
-        """
-        treat() calls the treat_page()
-
-        Since treat_page() exits early where possible, we need to perform a null edit
-        after treat_page() to flush the cache.
-
-        Hook into this method to perform the null edit after treat_page()
-        """
-        super().treat(page)
-
-        # Based on touch.py script https://github.com/wikimedia/pywikibot/blob/master/scripts/touch.py
-        if self.null_edit:
-            self.current_page.touch()
 
     def treat_page(self) -> None:
         mid = f"M{self.current_page.pageid}"
@@ -362,6 +346,13 @@ class BaseBot(ExistingPageBot):
             request.submit()
             info(
                 f"Updating {self.wiki_properties.mid} took {(perf_counter() - start):.1f} s"
+            )
+
+            # Perform null edit to flush any tracker categories
+            content = self.current_page.get(force=True) + "\n"
+            self.current_page.text = content
+            self.current_page.save(
+                summary='null edit',
             )
         except Exception as e:
             critical(f"Failed to update: {e}")
