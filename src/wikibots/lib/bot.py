@@ -352,7 +352,7 @@ class BaseBot(ExistingPageBot):
             content = self.current_page.get(force=True) + "\n"
             self.current_page.text = content
             self.current_page.save(
-                summary='null edit',
+                summary="null edit",
             )
         except Exception as e:
             critical(f"Failed to update: {e}")
