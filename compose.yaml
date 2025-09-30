@@ -7,7 +7,6 @@ services:
       - redis:/data
 
   pas:
-    image: tools-harbor.wmcloud.org/tool-curator/wikibots:latest
     pull_policy: always
     command: ["pas"]
     environment:
@@ -18,6 +17,11 @@ services:
       PWB_USERNAME: $CURATORBOT_PWB_USERNAME
       TOOL_REDIS_URI: "redis://redis"
       EMAIL: $EMAIL
+    image: tools-harbor.wmcloud.org/tool-curator/wikibots:latest
+    restart: "always"
+    # build: .
+    # volumes:
+    #   - ./src:/app/src
     depends_on:
       - redis
 

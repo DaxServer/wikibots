@@ -36,7 +36,7 @@ class WikiProperties:
 class BaseBot(ExistingPageBot):
     summary = "add [[Commons:Structured data|SDC]] based on metadata"
     redis_prefix = ""
-    throttle = 10
+    throttle = 5
 
     def __init__(self, **kwargs: Any):
         self.dry_run = "--dry-run" in sys.argv
@@ -346,6 +346,13 @@ class BaseBot(ExistingPageBot):
             request.submit()
             info(
                 f"Updating {self.wiki_properties.mid} took {(perf_counter() - start):.1f} s"
+            )
+
+            # Perform null edit to flush any tracker categories
+            content = self.current_page.get(force=True) + "\n"
+            self.current_page.text = content
+            self.current_page.save(
+                summary="null edit",
             )
         except Exception as e:
             critical(f"Failed to update: {e}")

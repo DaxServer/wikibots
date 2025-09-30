@@ -1,0 +1,12 @@
+.ai*
+.git*
+.poetry
+.venv
+__pycache__
+apicache
+ignored
+
+pywikibot-*.lwp
+throttle.ctrl
+user-password.py
+*.sh
