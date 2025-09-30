@@ -10,6 +10,7 @@ services:
     image: tools-harbor.wmcloud.org/tool-curator/wikibots:latest
     pull_policy: always
     command: ["pas"]
+    restart: "always"
     environment:
       PWB_CONSUMER_TOKEN: $CURATORBOT_PWB_CONSUMER_TOKEN
       PWB_CONSUMER_SECRET: $CURATORBOT_PWB_CONSUMER_SECRET
