@@ -37,6 +37,7 @@ class BaseBot(ExistingPageBot):
     summary = "add [[Commons:Structured data|SDC]] based on metadata"
     redis_prefix = ""
     throttle = 5
+    always_null_edit = False
 
     def __init__(self, **kwargs: Any):
         self.dry_run = "--dry-run" in sys.argv
@@ -315,11 +316,24 @@ class BaseBot(ExistingPageBot):
 
         return self.wiki_properties.hash or ""
 
+    def null_edit(self) -> None:
+        # Perform null edit to flush any tracker categories
+        content = self.current_page.get(force=True) + "\n"
+        self.current_page.text = content
+        self.current_page.save(
+            summary="null edit",
+        )
+
     def save(self) -> None:
         assert self.wiki_properties
 
         if not self.wiki_properties.new_claims:
             info("No claims to set")
+
+            if self.always_null_edit:
+                info("Performing null edit to flush any tracker categories")
+                self.null_edit()
+
             return
 
         claims = [claim.toJSON() for claim in self.wiki_properties.new_claims]
@@ -348,12 +362,7 @@ class BaseBot(ExistingPageBot):
                 f"Updating {self.wiki_properties.mid} took {(perf_counter() - start):.1f} s"
             )
 
-            # Perform null edit to flush any tracker categories
-            content = self.current_page.get(force=True) + "\n"
-            self.current_page.text = content
-            self.current_page.save(
-                summary="null edit",
-            )
+            self.null_edit()
         except Exception as e:
             critical(f"Failed to update: {e}")
 
