@@ -18,12 +18,13 @@ from wikibots.lib.wikidata import WikidataProperty, WikidataEntity
 class FlickrBot(BaseBot):
     redis_prefix = "xQ6cz5J84Viw/K6FIcOH1kxJjfiS8jO56AoSmhBgO/A="
     summary = "add [[Commons:Structured data|SDC]] based on metadata from Flickr"
+    always_null_edit = True
 
     def __init__(self, **kwargs: Any):
         super().__init__(**kwargs)
 
         self.generator = SearchPageGenerator(
-            f'file: incategory:"Flickr images reviewed by FlickreviewR 2" -haswbstatement:{WikidataProperty.FlickrPhotoId} hastemplate:"FlickreviewR"',
+            f'file: incategory:"Flickr images reviewed by FlickreviewR 2" hastemplate:"FlickreviewR" deepcategory:"Flickr images missing SDC data"',
             site=self.commons,
         )
 
