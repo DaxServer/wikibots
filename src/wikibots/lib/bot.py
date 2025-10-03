@@ -334,6 +334,10 @@ class BaseBot(ExistingPageBot):
                 info("Performing null edit to flush any tracker categories")
                 self.null_edit()
 
+            # Set the Redis key to 1 to indicate that the claims have been set
+            # It is possible that some info might still be missing. Ex: date_taken can be unknown
+            self.redis.set(self.wiki_properties.redis_key, 1)
+
             return
 
         claims = [claim.toJSON() for claim in self.wiki_properties.new_claims]

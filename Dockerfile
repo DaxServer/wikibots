@@ -7,4 +7,4 @@ COPY . .
 
 RUN poetry install
 
-ENTRYPOINT [ "poetry", "run", "pas" ]
+ENTRYPOINT [ "poetry", "run" ]
