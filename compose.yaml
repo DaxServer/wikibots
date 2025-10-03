@@ -15,6 +15,7 @@ services:
       PWB_ACCESS_TOKEN: $CURATORBOT_PWB_ACCESS_TOKEN
       PWB_ACCESS_SECRET: $CURATORBOT_PWB_ACCESS_SECRET
       PWB_USERNAME: $CURATORBOT_PWB_USERNAME
+      FLICKR_API_KEY: $FLICKR_API_KEY
       TOOL_REDIS_URI: "redis://redis"
       EMAIL: $EMAIL
     image: tools-harbor.wmcloud.org/tool-curator/wikibots:latest
