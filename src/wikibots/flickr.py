@@ -62,9 +62,9 @@ class FlickrBot(BaseBot):
         )
         self.create_source_claim(self.photo["url"], WikidataEntity.Flickr)
         self.create_location_claim(self.photo["location"])
-        self.create_published_in_claim(
-            published_in=WikidataEntity.Flickr, date_posted=self.photo["date_posted"]
-        )
+        # self.create_published_in_claim(
+        #     published_in=WikidataEntity.Flickr, date_posted=self.photo["date_posted"]
+        # )
         self._create_inception_claim()
 
         self.save()
