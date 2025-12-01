@@ -110,9 +110,9 @@ class PortableAntiquitiesSchemeBot(BaseBot):
         else:
             warning("No created field found in API response")
 
-        self.create_published_in_claim(
-            WikidataEntity.PortableAntiquitiesSchemeDatabase, date_obj
-        )
+        # self.create_published_in_claim(
+        #     WikidataEntity.PortableAntiquitiesSchemeDatabase, date_obj
+        # )
 
         self.save()
 
