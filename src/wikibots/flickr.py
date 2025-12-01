@@ -25,8 +25,7 @@ class FlickrBot(BaseBot):
 
         self.generator = SearchPageGenerator(
             'file: incategory:"Flickr images reviewed by FlickreviewR 2" hastemplate:"FlickreviewR" '
-            f"-haswbstatement:{WikidataProperty.FlickrPhotoId}|{WikidataProperty.Creator}|"
-            f"{WikidataProperty.PublishedIn}|{WikidataProperty.SourceOfFile}",
+            f"-haswbstatement:{WikidataProperty.FlickrPhotoId}|{WikidataProperty.Creator}|{WikidataProperty.SourceOfFile}",
             site=self.commons,
         )
 
