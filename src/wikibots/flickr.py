@@ -45,6 +45,13 @@ class FlickrBot(BaseBot):
         if photo_id is None:
             return
 
+        self.get_file_exif()
+
+        self.create_exposure_time_claim()
+        self.create_iso_speed_claim()
+        self.create_fnumber_claim()
+        self.create_focal_length_claim()
+
         self.get_flickr_photo(photo_id)
 
         if self.photo is None:
