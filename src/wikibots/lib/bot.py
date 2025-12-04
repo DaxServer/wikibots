@@ -4,6 +4,7 @@ import sys
 from contextlib import suppress
 from dataclasses import dataclass, field
 from datetime import datetime
+from fractions import Fraction
 from pprint import pprint
 from time import perf_counter
 from typing import Any
@@ -12,10 +13,19 @@ import mwparserfromhell
 import requests
 from deepdiff import DeepDiff
 from mwparserfromhell.wikicode import Wikicode
-from pywikibot import Site, info, critical, Claim, ItemPage, warning, WbTime, Timestamp
+from pywikibot import (
+    Site,
+    WbQuantity,
+    info,
+    critical,
+    Claim,
+    ItemPage,
+    warning,
+    WbTime,
+    Timestamp,
+)
 from pywikibot.bot import ExistingPageBot
 from pywikibot.data.api import Request
-from pywikibot.page import BasePage
 from pywikibot.page._collections import ClaimCollection
 from pywikibot.scripts.wrapper import pwb
 from redis import Redis
@@ -31,6 +41,7 @@ class WikiProperties:
     new_claims: list[Claim] = field(default_factory=list)
     wikicode: Wikicode | None = None
     hash: str | None = None
+    metadata: dict[str, str | int | float] = field(default_factory=dict)
 
 
 class BaseBot(ExistingPageBot):
@@ -154,6 +165,20 @@ class BaseBot(ExistingPageBot):
 
         return None
 
+    def _to_number(self, value: str | None) -> int | float | None:
+        if value is None:
+            return None
+
+        try:
+            fraction = Fraction(value)
+
+            if fraction.is_integer():
+                return int(fraction)
+
+            return float(fraction)
+        except (ValueError, ZeroDivisionError):
+            return None
+
     def create_creator_claim(
         self, author_name_string: str | None = None, url: str | None = None
     ) -> None:
@@ -199,6 +224,68 @@ class BaseBot(ExistingPageBot):
 
         self.wiki_properties.new_claims.append(claim)
 
+    def create_exposure_time_claim(self):
+        assert self.wiki_properties
+
+        exposure_time = self._to_number(
+            self.wiki_properties.metadata.get("ExposureTime")
+        )
+
+        if (
+            exposure_time is None
+            or WikidataProperty.ExposureTime in self.wiki_properties.existing_claims
+        ):
+            return
+
+        quantity = WbQuantity(
+            amount=exposure_time,
+            unit=ItemPage(self.wikidata, WikidataEntity.Second),
+        )
+
+        claim = Claim(self.commons, WikidataProperty.ExposureTime)
+        claim.setTarget(quantity)
+
+        self.wiki_properties.new_claims.append(claim)
+
+    def create_fnumber_claim(self) -> None:
+        assert self.wiki_properties
+
+        fnumber = self._to_number(self.wiki_properties.metadata.get("FNumber"))
+
+        if (
+            fnumber is None
+            or WikidataProperty.FNumber in self.wiki_properties.existing_claims
+        ):
+            return
+
+        quantity = WbQuantity(amount=fnumber)
+
+        claim = Claim(self.commons, WikidataProperty.FNumber)
+        claim.setTarget(quantity)
+
+        self.wiki_properties.new_claims.append(claim)
+
+    def create_focal_length_claim(self) -> None:
+        assert self.wiki_properties
+
+        focal_length = self._to_number(self.wiki_properties.metadata.get("FocalLength"))
+
+        if (
+            focal_length is None
+            or WikidataProperty.FocalLength in self.wiki_properties.existing_claims
+        ):
+            return
+
+        quantity = WbQuantity(
+            amount=focal_length,
+            unit=ItemPage(self.wikidata, WikidataEntity.MilliMeter),
+        )
+
+        claim = Claim(self.commons, WikidataProperty.FocalLength)
+        claim.setTarget(quantity)
+
+        self.wiki_properties.new_claims.append(claim)
+
     def create_id_claim(self, property: str, value: str) -> None:
         assert self.wiki_properties
 
@@ -225,6 +312,24 @@ class BaseBot(ExistingPageBot):
             )
             circa_qualifier.setTarget(ItemPage(self.wikidata, WikidataEntity.Circa))
             claim.addQualifier(circa_qualifier)
+
+        self.wiki_properties.new_claims.append(claim)
+
+    def create_iso_speed_claim(self) -> None:
+        assert self.wiki_properties
+
+        iso_speed = self.wiki_properties.metadata.get("ISOSpeedRatings")
+
+        if (
+            iso_speed is None
+            or WikidataProperty.ISOSpeed in self.wiki_properties.existing_claims
+        ):
+            return
+
+        quantity = WbQuantity(amount=iso_speed)
+
+        claim = Claim(self.commons, WikidataProperty.ISOSpeed)
+        claim.setTarget(quantity)
 
         self.wiki_properties.new_claims.append(claim)
 
@@ -289,6 +394,29 @@ class BaseBot(ExistingPageBot):
     def hook_source_claim(self, claim: Claim) -> None:
         pass
 
+    def get_file_exif(self):
+        assert self.current_page
+
+        payload = {
+            "action": "query",
+            "pageids": self.current_page.pageid,
+            "prop": "imageinfo",
+            "iiprop": "metadata",
+            "format": "json",
+            "formatversion": 2,
+        }
+
+        try:
+            start = perf_counter()
+            response = self.commons.simple_request(**payload).submit()
+            info(f"Queried Wiki file EXIF in {(perf_counter() - start) * 1000:.1f} ms")
+            self.wiki_properties.metadata = {
+                m["name"]: m["value"]
+                for m in response["query"]["pages"][0]["imageinfo"][0]["metadata"]
+            }
+        except Exception as e:
+            critical(f"Failed to get file EXIF: {e}")
+
     def get_file_hash(self) -> str:
         assert self.wiki_properties
 
@@ -329,6 +457,10 @@ class BaseBot(ExistingPageBot):
 
         if not self.wiki_properties.new_claims:
             info("No claims to set")
+
+            if self.dry_run:
+                info("Dry run mode: skipping save operation")
+                self.quit()
 
             if self.always_null_edit:
                 info("Performing null edit to flush any tracker categories")
