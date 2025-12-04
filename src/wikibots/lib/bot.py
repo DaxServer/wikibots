@@ -26,6 +26,7 @@ from pywikibot import (
 )
 from pywikibot.bot import ExistingPageBot
 from pywikibot.data.api import Request
+from pywikibot.page import BasePage
 from pywikibot.page._collections import ClaimCollection
 from pywikibot.scripts.wrapper import pwb
 from redis import Redis
