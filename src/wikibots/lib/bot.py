@@ -184,7 +184,7 @@ class BaseBot(ExistingPageBot):
 
         return None
 
-    def _to_number(self, value: str | None) -> int | float | None:
+    def _to_number(self, value: str | int | float | None) -> int | float | None:
         if value is None:
             return None
 
