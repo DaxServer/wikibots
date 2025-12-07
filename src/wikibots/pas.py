@@ -93,7 +93,9 @@ class PortableAntiquitiesSchemeBot(BaseBot):
         self.get_file_metadata()
 
         if image_hash != self.wiki_properties.sha1:
-            warning(f"Invalid image hash found: {image_hash} != {self.wiki_properties.sha1}")
+            warning(
+                f"Invalid image hash found: {image_hash} != {self.wiki_properties.sha1}"
+            )
             self.redis.set(self.wiki_properties.redis_key, 1)
             return
 

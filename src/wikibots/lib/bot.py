@@ -104,8 +104,12 @@ class BaseBot(ExistingPageBot):
         self.wikidata_items = {
             WikidataEntity.Byte: ItemPage(self.wikidata, WikidataEntity.Byte),
             WikidataEntity.Circa: ItemPage(self.wikidata, WikidataEntity.Circa),
-            WikidataEntity.FileAvailableOnInternet: ItemPage(self.wikidata, WikidataEntity.FileAvailableOnInternet),
-            WikidataEntity.MilliMeter: ItemPage(self.wikidata, WikidataEntity.MilliMeter),
+            WikidataEntity.FileAvailableOnInternet: ItemPage(
+                self.wikidata, WikidataEntity.FileAvailableOnInternet
+            ),
+            WikidataEntity.MilliMeter: ItemPage(
+                self.wikidata, WikidataEntity.MilliMeter
+            ),
             WikidataEntity.Pixel: ItemPage(self.wikidata, WikidataEntity.Pixel),
             WikidataEntity.Second: ItemPage(self.wikidata, WikidataEntity.Second),
             WikidataEntity.SHA1: ItemPage(self.wikidata, WikidataEntity.SHA1),
@@ -208,7 +212,9 @@ class BaseBot(ExistingPageBot):
         claim = Claim(self.commons, WikidataProperty.Checksum)
         claim.setTarget(checksum)
 
-        determined_by_qualifier = Claim(self.commons, WikidataProperty.DeterminationMethod)
+        determined_by_qualifier = Claim(
+            self.commons, WikidataProperty.DeterminationMethod
+        )
         determined_by_qualifier.setTarget(self.wikidata_items[WikidataEntity.SHA1])
         claim.addQualifier(determined_by_qualifier)
 
@@ -293,7 +299,8 @@ class BaseBot(ExistingPageBot):
             return
 
         quantity = WbQuantity(
-            amount=exposure_time, unit=self.wikidata_items[WikidataEntity.Second],
+            amount=exposure_time,
+            unit=self.wikidata_items[WikidataEntity.Second],
         )
 
         claim = Claim(self.commons, WikidataProperty.ExposureTime)
@@ -331,7 +338,8 @@ class BaseBot(ExistingPageBot):
             return
 
         quantity = WbQuantity(
-            amount=focal_length, unit=self.wikidata_items[WikidataEntity.MilliMeter],
+            amount=focal_length,
+            unit=self.wikidata_items[WikidataEntity.MilliMeter],
         )
 
         claim = Claim(self.commons, WikidataProperty.FocalLength)
@@ -351,7 +359,8 @@ class BaseBot(ExistingPageBot):
             return
 
         quantity = WbQuantity(
-            amount=height, unit=self.wikidata_items[WikidataEntity.Pixel],
+            amount=height,
+            unit=self.wikidata_items[WikidataEntity.Pixel],
         )
 
         claim = Claim(self.commons, WikidataProperty.Height)
@@ -391,7 +400,9 @@ class BaseBot(ExistingPageBot):
     def create_iso_speed_claim(self) -> None:
         assert self.wiki_properties
 
-        iso_speed = self._to_number(self.wiki_properties.metadata.get("ISOSpeedRatings"))
+        iso_speed = self._to_number(
+            self.wiki_properties.metadata.get("ISOSpeedRatings")
+        )
 
         if (
             iso_speed is None
@@ -482,7 +493,9 @@ class BaseBot(ExistingPageBot):
         ):
             return
 
-        quantity = WbQuantity(amount=width, unit=self.wikidata_items[WikidataEntity.Pixel])
+        quantity = WbQuantity(
+            amount=width, unit=self.wikidata_items[WikidataEntity.Pixel]
+        )
 
         claim = Claim(self.commons, WikidataProperty.Width)
         claim.setTarget(quantity)
@@ -516,11 +529,12 @@ class BaseBot(ExistingPageBot):
         try:
             start = perf_counter()
             response = self.commons.simple_request(**payload).submit()
-            info(f"Queried Wiki file metadata in {(perf_counter() - start) * 1000:.1f} ms")
+            info(
+                f"Queried Wiki file metadata in {(perf_counter() - start) * 1000:.1f} ms"
+            )
             imageinfo = response["query"]["pages"][0]["imageinfo"][0]
             self.wiki_properties.metadata = {
-                m["name"]: m["value"]
-                for m in imageinfo["metadata"]
+                m["name"]: m["value"] for m in imageinfo["metadata"]
             }
             self.wiki_properties.size = imageinfo["size"]
             self.wiki_properties.width = imageinfo["width"]
