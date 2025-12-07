@@ -319,7 +319,7 @@ class BaseBot(ExistingPageBot):
     def create_iso_speed_claim(self) -> None:
         assert self.wiki_properties
 
-        iso_speed = self.wiki_properties.metadata.get("ISOSpeedRatings")
+        iso_speed = self._to_number(self.wiki_properties.metadata.get("ISOSpeedRatings"))
 
         if (
             iso_speed is None
