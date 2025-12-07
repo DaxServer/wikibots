@@ -25,7 +25,7 @@ class FlickrBot(BaseBot):
 
         self.generator = SearchPageGenerator(
             'file: incategory:"Flickr images reviewed by FlickreviewR 2" hastemplate:"FlickreviewR" '
-            f"-haswbstatement:{WikidataProperty.FlickrPhotoId}",
+            f"-haswbstatement:{WikidataProperty.FlickrPhotoId} -haswbstatement:{WikidataProperty.Checksum}",
             site=self.commons,
         )
 
@@ -45,12 +45,22 @@ class FlickrBot(BaseBot):
         if photo_id is None:
             return
 
-        self.get_file_exif()
+        self.get_file_metadata()
 
+        # EXIF
         self.create_exposure_time_claim()
         self.create_iso_speed_claim()
         self.create_fnumber_claim()
         self.create_focal_length_claim()
+
+        # Size
+        self.create_datasize_claim()
+        self.create_height_claim()
+        self.create_width_claim()
+
+        # Validation
+        self.create_checksum_claim()
+        self.create_media_type_claim()
 
         self.get_flickr_photo(photo_id)
 

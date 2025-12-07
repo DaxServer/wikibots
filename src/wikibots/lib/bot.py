@@ -41,8 +41,12 @@ class WikiProperties:
     existing_claims: ClaimCollection
     new_claims: list[Claim] = field(default_factory=list)
     wikicode: Wikicode | None = None
-    hash: str | None = None
+    sha1: str | None = None
+    mime: str | None = None
     metadata: dict[str, str | int | float] = field(default_factory=dict)
+    size: int | None = None
+    width: int | None = None
+    height: int | None = None
 
 
 class BaseBot(ExistingPageBot):
@@ -96,6 +100,20 @@ class BaseBot(ExistingPageBot):
         # Initialize a session for HTTP requests
         self.session = requests.Session()
         self.session.headers.update({"User-Agent": self.user_agent})
+
+        self.wikidata_items = {
+            WikidataEntity.Byte: ItemPage(self.wikidata, WikidataEntity.Byte),
+            WikidataEntity.Circa: ItemPage(self.wikidata, WikidataEntity.Circa),
+            WikidataEntity.FileAvailableOnInternet: ItemPage(
+                self.wikidata, WikidataEntity.FileAvailableOnInternet
+            ),
+            WikidataEntity.MilliMeter: ItemPage(
+                self.wikidata, WikidataEntity.MilliMeter
+            ),
+            WikidataEntity.Pixel: ItemPage(self.wikidata, WikidataEntity.Pixel),
+            WikidataEntity.Second: ItemPage(self.wikidata, WikidataEntity.Second),
+            WikidataEntity.SHA1: ItemPage(self.wikidata, WikidataEntity.SHA1),
+        }
 
     def skip_page(self, page: BasePage) -> bool:
         return bool(self.redis.exists(f"{self.redis_prefix}:commons:M{page.pageid}"))
@@ -166,7 +184,7 @@ class BaseBot(ExistingPageBot):
 
         return None
 
-    def _to_number(self, value: str | None) -> int | float | None:
+    def _to_number(self, value: str | int | float | None) -> int | float | None:
         if value is None:
             return None
 
@@ -179,6 +197,28 @@ class BaseBot(ExistingPageBot):
             return float(fraction)
         except (ValueError, ZeroDivisionError):
             return None
+
+    def create_checksum_claim(self) -> None:
+        assert self.wiki_properties
+
+        checksum = self.wiki_properties.sha1
+
+        if (
+            checksum is None
+            or WikidataProperty.Checksum in self.wiki_properties.existing_claims
+        ):
+            return
+
+        claim = Claim(self.commons, WikidataProperty.Checksum)
+        claim.setTarget(checksum)
+
+        determined_by_qualifier = Claim(
+            self.commons, WikidataProperty.DeterminationMethod
+        )
+        determined_by_qualifier.setTarget(self.wikidata_items[WikidataEntity.SHA1])
+        claim.addQualifier(determined_by_qualifier)
+
+        self.wiki_properties.new_claims.append(claim)
 
     def create_creator_claim(
         self, author_name_string: str | None = None, url: str | None = None
@@ -205,6 +245,26 @@ class BaseBot(ExistingPageBot):
 
         with suppress(AssertionError):
             self.hook_creator_claim(claim)
+
+        self.wiki_properties.new_claims.append(claim)
+
+    def create_datasize_claim(self) -> None:
+        assert self.wiki_properties
+
+        datasize = self._to_number(self.wiki_properties.size)
+
+        if (
+            datasize is None
+            or WikidataProperty.DataSize in self.wiki_properties.existing_claims
+        ):
+            return
+
+        quantity = WbQuantity(
+            amount=datasize, unit=self.wikidata_items[WikidataEntity.Byte]
+        )
+
+        claim = Claim(self.commons, WikidataProperty.DataSize)
+        claim.setTarget(quantity)
 
         self.wiki_properties.new_claims.append(claim)
 
@@ -240,7 +300,7 @@ class BaseBot(ExistingPageBot):
 
         quantity = WbQuantity(
             amount=exposure_time,
-            unit=ItemPage(self.wikidata, WikidataEntity.Second),
+            unit=self.wikidata_items[WikidataEntity.Second],
         )
 
         claim = Claim(self.commons, WikidataProperty.ExposureTime)
@@ -279,10 +339,31 @@ class BaseBot(ExistingPageBot):
 
         quantity = WbQuantity(
             amount=focal_length,
-            unit=ItemPage(self.wikidata, WikidataEntity.MilliMeter),
+            unit=self.wikidata_items[WikidataEntity.MilliMeter],
         )
 
         claim = Claim(self.commons, WikidataProperty.FocalLength)
+        claim.setTarget(quantity)
+
+        self.wiki_properties.new_claims.append(claim)
+
+    def create_height_claim(self) -> None:
+        assert self.wiki_properties
+
+        height = self._to_number(self.wiki_properties.height)
+
+        if (
+            height is None
+            or WikidataProperty.Height in self.wiki_properties.existing_claims
+        ):
+            return
+
+        quantity = WbQuantity(
+            amount=height,
+            unit=self.wikidata_items[WikidataEntity.Pixel],
+        )
+
+        claim = Claim(self.commons, WikidataProperty.Height)
         claim.setTarget(quantity)
 
         self.wiki_properties.new_claims.append(claim)
@@ -311,7 +392,7 @@ class BaseBot(ExistingPageBot):
             circa_qualifier = Claim(
                 self.commons, WikidataProperty.SourcingCircumstances
             )
-            circa_qualifier.setTarget(ItemPage(self.wikidata, WikidataEntity.Circa))
+            circa_qualifier.setTarget(self.wikidata_items[WikidataEntity.Circa])
             claim.addQualifier(circa_qualifier)
 
         self.wiki_properties.new_claims.append(claim)
@@ -319,7 +400,9 @@ class BaseBot(ExistingPageBot):
     def create_iso_speed_claim(self) -> None:
         assert self.wiki_properties
 
-        iso_speed = self._to_number(self.wiki_properties.metadata.get("ISOSpeedRatings"))
+        iso_speed = self._to_number(
+            self.wiki_properties.metadata.get("ISOSpeedRatings")
+        )
 
         if (
             iso_speed is None
@@ -331,6 +414,22 @@ class BaseBot(ExistingPageBot):
 
         claim = Claim(self.commons, WikidataProperty.ISOSpeed)
         claim.setTarget(quantity)
+
+        self.wiki_properties.new_claims.append(claim)
+
+    def create_media_type_claim(self) -> None:
+        assert self.wiki_properties
+
+        media_type = self.wiki_properties.mime
+
+        if (
+            media_type is None
+            or WikidataProperty.MediaType in self.wiki_properties.existing_claims
+        ):
+            return
+
+        claim = Claim(self.commons, WikidataProperty.MediaType)
+        claim.setTarget(media_type)
 
         self.wiki_properties.new_claims.append(claim)
 
@@ -365,7 +464,7 @@ class BaseBot(ExistingPageBot):
             return
 
         claim = Claim(self.commons, WikidataProperty.SourceOfFile)
-        claim.setTarget(ItemPage(self.wikidata, WikidataEntity.FileAvailableOnInternet))
+        claim.setTarget(self.wikidata_items[WikidataEntity.FileAvailableOnInternet])
 
         described_at_url_qualifier = Claim(
             self.commons, WikidataProperty.DescribedAtUrl
@@ -383,6 +482,26 @@ class BaseBot(ExistingPageBot):
 
         self.wiki_properties.new_claims.append(claim)
 
+    def create_width_claim(self) -> None:
+        assert self.wiki_properties
+
+        width = self._to_number(self.wiki_properties.width)
+
+        if (
+            width is None
+            or WikidataProperty.Width in self.wiki_properties.existing_claims
+        ):
+            return
+
+        quantity = WbQuantity(
+            amount=width, unit=self.wikidata_items[WikidataEntity.Pixel]
+        )
+
+        claim = Claim(self.commons, WikidataProperty.Width)
+        claim.setTarget(quantity)
+
+        self.wiki_properties.new_claims.append(claim)
+
     def hook_creator_claim(self, claim: Claim) -> None:
         pass
 
@@ -395,14 +514,14 @@ class BaseBot(ExistingPageBot):
     def hook_source_claim(self, claim: Claim) -> None:
         pass
 
-    def get_file_exif(self):
+    def get_file_metadata(self):
         assert self.current_page
 
         payload = {
             "action": "query",
             "pageids": self.current_page.pageid,
             "prop": "imageinfo",
-            "iiprop": "metadata",
+            "iiprop": "metadata|size|sha1|mime",
             "format": "json",
             "formatversion": 2,
         }
@@ -410,40 +529,20 @@ class BaseBot(ExistingPageBot):
         try:
             start = perf_counter()
             response = self.commons.simple_request(**payload).submit()
-            info(f"Queried Wiki file EXIF in {(perf_counter() - start) * 1000:.1f} ms")
+            info(
+                f"Queried Wiki file metadata in {(perf_counter() - start) * 1000:.1f} ms"
+            )
+            imageinfo = response["query"]["pages"][0]["imageinfo"][0]
             self.wiki_properties.metadata = {
-                m["name"]: m["value"]
-                for m in response["query"]["pages"][0]["imageinfo"][0]["metadata"]
+                m["name"]: m["value"] for m in imageinfo["metadata"]
             }
+            self.wiki_properties.size = imageinfo["size"]
+            self.wiki_properties.width = imageinfo["width"]
+            self.wiki_properties.height = imageinfo["height"]
+            self.wiki_properties.mime = imageinfo["mime"]
+            self.wiki_properties.sha1 = imageinfo["sha1"]
         except Exception as e:
-            critical(f"Failed to get file EXIF: {e}")
-
-    def get_file_hash(self) -> str:
-        assert self.wiki_properties
-
-        if self.wiki_properties.hash:
-            return self.wiki_properties.hash
-
-        payload = {
-            "action": "query",
-            "prop": "imageinfo",
-            "pageids": self.current_page.pageid,
-            "iiprop": "sha1",
-            "format": "json",
-            "formatversion": "2",
-        }
-
-        try:
-            start = perf_counter()
-            response = self.commons.simple_request(**payload).submit()
-            info(f"Queried Wiki file hash in {(perf_counter() - start) * 1000:.1f} ms")
-            self.wiki_properties.hash = response["query"]["pages"][0]["imageinfo"][0][
-                "sha1"
-            ]
-        except Exception as e:
-            critical(f"Failed to get file hash: {e}")
-
-        return self.wiki_properties.hash or ""
+            critical(f"Failed to get file metadata: {e}")
 
     def null_edit(self) -> None:
         # Perform null edit to flush any tracker categories
