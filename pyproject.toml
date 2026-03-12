@@ -21,7 +21,7 @@ dependencies = [
 packages = [{include = "wikibots", from = "src"}]
 
 [tool.poetry.group.dev.dependencies]
-black = "^25.1.0"
+black = "^26.3.1"
 
 [project.scripts]
 flickr = "wikibots.flickr:main"
