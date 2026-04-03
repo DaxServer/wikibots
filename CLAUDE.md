@@ -71,3 +71,4 @@ The `status` parameter determines the review outcome. Only `pass` means the lice
 ### Constraints
 
 - `redis` must stay on `<6.0.0` — Toolforge runs Redis server 6.0.16, and redis-py 7.x requires Redis 7.2+.
+- pywikibot config is accessed via `pwb.config` where `pwb` is imported from `pywikibot.scripts.wrapper`. Importing through the wrapper triggers proper pywikibot initialization — using `pywikibot.config` directly does not work. The ty `possibly-missing-submodule` warnings on `pwb.config` are expected (exit 0).
