@@ -85,32 +85,14 @@ class FlickrBot(BaseBot):
     def extract_flickr_data(self) -> str | None:
         assert self.wiki_properties
 
-        self.parse_wikicode()
-        assert self.wiki_properties.wikicode
-
-        templates = [
-            w
-            for w in self.wiki_properties.wikicode.filter_templates()
-            if w.name.strip() == "FlickreviewR"
-        ]
-        if not templates:
-            warning("No FlickreviewR template found")
-            self.redis.set(self.wiki_properties.redis_key, 1)
-            return None
-
-        t = templates[0]
-        review_status = str(t.get("status").value).strip() if t.has("status") else None
+        review_status = self.retrieve_template_data(["FlickreviewR"], ["status"])
         if review_status != "pass":
             warning(f"Skipping: FlickreviewR status is {review_status!r}, not 'pass'")
             self.redis.set(self.wiki_properties.redis_key, 1)
             return None
 
-        flickr_url = (
-            str(t.get("sourceurl").value).strip() if t.has("sourceurl") else None
-        )
+        flickr_url = self.retrieve_template_data(["FlickreviewR"], ["sourceurl"])
         if flickr_url is None:
-            warning("FlickreviewR template is missing sourceurl")
-            self.redis.set(self.wiki_properties.redis_key, 1)
             return None
 
         info(flickr_url)
