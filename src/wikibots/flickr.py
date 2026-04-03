@@ -86,7 +86,7 @@ class FlickrBot(BaseBot):
         assert self.wiki_properties
 
         review_status = self.retrieve_template_data(["FlickreviewR"], ["status"])
-        if review_status != "pass":
+        if review_status not in ("pass", "passed"):
             warning(f"Skipping: FlickreviewR status is {review_status!r}, not 'pass'")
             self.redis.set(self.wiki_properties.redis_key, 1)
             return None

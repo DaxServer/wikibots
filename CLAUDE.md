@@ -66,7 +66,7 @@ Deployed to Wikimedia Toolforge as containerized jobs. Build with `toolforge bui
 
 `{{FlickreviewR |status= |author= |sourceurl= |reviewdate= |reviewlicense= |reviewer= |archive= }}`
 
-The `status` parameter determines the review outcome. Only `pass` means the license is compatible. Other values: `fail`, `notmatching`, `error`, `nosource`, `notfound`, `pass-change`, `public-domain-mark`, `library-of-congress`, `powerhouse-museum`, `bad-author`.
+The `status` parameter determines the review outcome. Only `pass` means the license is compatible. The template supports aliases (see [[Template:FlickreviewR/status aliases]]) — `passed` is an alias for `pass`. Other values: `fail`/`failed`, `notmatching`, `error`, `nosource`, `notfound`, `pass-change`/`passed_changed`, `public-domain-mark`, `library-of-congress`, `powerhouse-museum`, `bad-author`.
 
 ### Constraints
 
