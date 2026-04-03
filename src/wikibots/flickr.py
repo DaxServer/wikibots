@@ -78,9 +78,6 @@ class FlickrBot(BaseBot):
         )
         self.create_source_claim(self.photo["url"], WikidataEntity.Flickr)
         self.create_location_claim(self.photo["location"])
-        # self.create_published_in_claim(
-        #     published_in=WikidataEntity.Flickr, date_posted=self.photo["date_posted"]
-        # )
         self._create_inception_claim()
 
         self.save()
@@ -137,7 +134,8 @@ class FlickrBot(BaseBot):
             time.sleep(60)
 
     def hook_creator_claim(self, claim: Claim) -> None:
-        assert self.photo
+        if not self.photo:
+            return
 
         flickr_user_id_qualifier = Claim(self.commons, WikidataProperty.FlickrUserId)
         flickr_user_id_qualifier.setTarget(self.photo["owner"]["id"])
@@ -296,7 +294,7 @@ class FlickrBot(BaseBot):
             """
 
             error(f"Unrecognised location accuracy: {location['accuracy']}")
-            return None
+            return
 
         claim = Claim(self.commons, WikidataProperty.CoordinatesOfThePointOfView)
         claim.setTarget(
@@ -308,8 +306,6 @@ class FlickrBot(BaseBot):
         )
 
         self.wiki_properties.new_claims.append(claim)
-
-        return None
 
 
 def main() -> None:

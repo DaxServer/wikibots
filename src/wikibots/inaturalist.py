@@ -47,20 +47,10 @@ class PhotoData:
 
 
 def _extract_orcid_id(orcid_url: str | None) -> str | None:
-    """Extract ORCID ID from URL.
-
-    Args:
-        orcid_url: ORCID URL or None
-
-    Returns:
-        ORCID ID or None
-    """
+    """Extract ORCID ID from a URL like https://orcid.org/0000-0000-0000-0000."""
     if not orcid_url:
         return None
 
-    # Extract ORCID ID from URL (e.g., https://orcid.org/0000-0000-0000-0000)
-    # Using a simpler regex pattern that matches the ORCID format
-    # WikidataProperty.ORCID is P496
     matches = re.search(r"(\d{4}-\d{4}-\d{4}-\d{3}[\dX])", orcid_url)
 
     return matches.group(1) if matches else None
@@ -69,11 +59,12 @@ def _extract_orcid_id(orcid_url: str | None) -> str | None:
 class INaturalistBot(BaseBot):
     redis_prefix = "ZHXgxFHT4ZBJjR+fLxCH9quuLYl7ky4N6fNV/oC4fbs="
     summary = "add [[Commons:Structured data|SDC]] based on metadata from iNaturalist"
-    # Cache for taxa-Wikidata item mappings
-    taxa_wikidata_map = {}
 
     def __init__(self, **kwargs: Any):
         super().__init__(**kwargs)
+
+        # Cache for taxa-Wikidata item mappings
+        self.taxa_wikidata_map: dict[int, ItemPage] = {}
 
         self.generator = SearchPageGenerator(
             f"file: hastemplate:iNaturalist hastemplate:iNaturalistReview -haswbstatement:{WikidataProperty.INaturalistPhotoId}",
@@ -205,11 +196,11 @@ class INaturalistBot(BaseBot):
 
         for taxa_id in reversed(taxa["ancestor_ids"]):
             # Check if taxa_id is already in the cache
-            if taxa_id in self.__class__.taxa_wikidata_map:
+            if taxa_id in self.taxa_wikidata_map:
                 info(
-                    f"Using cached Wikidata item for taxa https://www.inaturalist.org/taxa/{taxa_id} - {self.__class__.taxa_wikidata_map[taxa_id].getID()}"
+                    f"Using cached Wikidata item for taxa https://www.inaturalist.org/taxa/{taxa_id} - {self.taxa_wikidata_map[taxa_id].getID()}"
                 )
-                self.photo.depicts = self.__class__.taxa_wikidata_map[taxa_id]
+                self.photo.depicts = self.taxa_wikidata_map[taxa_id]
                 break
 
             info(f"Searching Wikidata for taxon with ID {taxa_id}")
@@ -236,12 +227,13 @@ class INaturalistBot(BaseBot):
             )
 
             # Store the mapping in the cache
-            self.__class__.taxa_wikidata_map[taxa_id] = item
+            self.taxa_wikidata_map[taxa_id] = item
             self.photo.depicts = item
             break
 
     def hook_creator_claim(self, claim: Claim) -> None:
-        assert self.photo and self.photo.creator
+        if not self.photo or not self.photo.creator:
+            return
 
         inaturalist_user_id_qualifier = Claim(
             self.commons, WikidataProperty.INaturalistUserId
@@ -255,7 +247,9 @@ class INaturalistBot(BaseBot):
             claim.addQualifier(orcid_qualifier)
 
     def hook_creator_target(self, claim: Claim) -> None:
-        assert self.photo and self.photo.creator
+        if not self.photo or not self.photo.creator:
+            claim.setSnakType("somevalue")
+            return
 
         creator_item = self.find_creator_wikidata_item()
 
@@ -265,7 +259,8 @@ class INaturalistBot(BaseBot):
             claim.setSnakType("somevalue")
 
     def hook_depicts_claim(self, claim: Claim) -> None:
-        assert self.photo and self.photo.depicts
+        if not self.photo or not self.photo.depicts:
+            return
 
         stated_in_ref = Claim(self.commons, WikidataProperty.StatedIn)
         stated_in_ref.setTarget(self.inaturalist_wd)

@@ -1,7 +1,6 @@
 import json
 import os
 import sys
-from contextlib import suppress
 from dataclasses import dataclass, field
 from datetime import datetime
 from fractions import Fraction
@@ -232,8 +231,7 @@ class BaseBot(ExistingPageBot):
 
         claim = Claim(self.commons, WikidataProperty.Creator)
 
-        with suppress(AssertionError):
-            self.hook_creator_target(claim)
+        self.hook_creator_target(claim)
 
         if author_name_string:
             author_qualifier = Claim(self.commons, WikidataProperty.AuthorNameString)
@@ -245,8 +243,7 @@ class BaseBot(ExistingPageBot):
             url_qualifier.setTarget(url)
             claim.addQualifier(url_qualifier)
 
-        with suppress(AssertionError):
-            self.hook_creator_claim(claim)
+        self.hook_creator_claim(claim)
 
         self.wiki_properties.new_claims.append(claim)
 
@@ -282,8 +279,7 @@ class BaseBot(ExistingPageBot):
         claim = Claim(self.commons, WikidataProperty.Depicts)
         claim.setTarget(depicts)
 
-        with suppress(AssertionError):
-            self.hook_depicts_claim(claim)
+        self.hook_depicts_claim(claim)
 
         self.wiki_properties.new_claims.append(claim)
 
@@ -479,8 +475,7 @@ class BaseBot(ExistingPageBot):
             operator_qualifier.setTarget(ItemPage(self.wikidata, operator))
             claim.addQualifier(operator_qualifier)
 
-        with suppress(AssertionError):
-            self.hook_source_claim(claim)
+        self.hook_source_claim(claim)
 
         self.wiki_properties.new_claims.append(claim)
 
