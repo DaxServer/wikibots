@@ -62,6 +62,12 @@ wikibots enriches Wikimedia Commons files with structured data (SDC) pulled from
 
 Deployed to Wikimedia Toolforge as containerized jobs. Build with `toolforge build start -L`. The `Procfile` defines the entry points for each bot.
 
+### FlickreviewR template structure
+
+`{{FlickreviewR |status= |author= |sourceurl= |reviewdate= |reviewlicense= |reviewer= |archive= }}`
+
+The `status` parameter determines the review outcome. Only `pass` means the license is compatible. Other values: `fail`, `notmatching`, `error`, `nosource`, `notfound`, `pass-change`, `public-domain-mark`, `library-of-congress`, `powerhouse-museum`, `bad-author`.
+
 ### Constraints
 
 - `redis` must stay on `<6.0.0` — Toolforge runs Redis server 6.0.16, and redis-py 7.x requires Redis 7.2+.
