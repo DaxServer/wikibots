@@ -78,9 +78,6 @@ class FlickrBot(BaseBot):
         )
         self.create_source_claim(self.photo["url"], WikidataEntity.Flickr)
         self.create_location_claim(self.photo["location"])
-        # self.create_published_in_claim(
-        #     published_in=WikidataEntity.Flickr, date_posted=self.photo["date_posted"]
-        # )
         self._create_inception_claim()
 
         self.save()
@@ -88,14 +85,32 @@ class FlickrBot(BaseBot):
     def extract_flickr_data(self) -> str | None:
         assert self.wiki_properties
 
-        review_status = self.retrieve_template_data(["FlickreviewR"], ["status"])
+        self.parse_wikicode()
+        assert self.wiki_properties.wikicode
+
+        templates = [
+            w
+            for w in self.wiki_properties.wikicode.filter_templates()
+            if w.name.strip() == "FlickreviewR"
+        ]
+        if not templates:
+            warning("No FlickreviewR template found")
+            self.redis.set(self.wiki_properties.redis_key, 1)
+            return None
+
+        t = templates[0]
+        review_status = str(t.get("status").value).strip() if t.has("status") else None
         if review_status != "pass":
             warning(f"Skipping: FlickreviewR status is {review_status!r}, not 'pass'")
             self.redis.set(self.wiki_properties.redis_key, 1)
             return None
 
-        flickr_url = self.retrieve_template_data(["FlickreviewR"], ["sourceurl"])
+        flickr_url = (
+            str(t.get("sourceurl").value).strip() if t.has("sourceurl") else None
+        )
         if flickr_url is None:
+            warning("FlickreviewR template is missing sourceurl")
+            self.redis.set(self.wiki_properties.redis_key, 1)
             return None
 
         info(flickr_url)
@@ -137,7 +152,8 @@ class FlickrBot(BaseBot):
             time.sleep(60)
 
     def hook_creator_claim(self, claim: Claim) -> None:
-        assert self.photo
+        if not self.photo:
+            return
 
         flickr_user_id_qualifier = Claim(self.commons, WikidataProperty.FlickrUserId)
         flickr_user_id_qualifier.setTarget(self.photo["owner"]["id"])
@@ -296,7 +312,7 @@ class FlickrBot(BaseBot):
             """
 
             error(f"Unrecognised location accuracy: {location['accuracy']}")
-            return None
+            return
 
         claim = Claim(self.commons, WikidataProperty.CoordinatesOfThePointOfView)
         claim.setTarget(
@@ -308,8 +324,6 @@ class FlickrBot(BaseBot):
         )
 
         self.wiki_properties.new_claims.append(claim)
-
-        return None
 
 
 def main() -> None:

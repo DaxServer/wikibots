@@ -30,3 +30,6 @@ jobs:
 
       - name: Run isort
         run: poetry run isort --check .
+
+      - name: Run type checker
+        run: poetry run ty check

@@ -37,14 +37,6 @@ class YouTubeBot(BaseBot):
     throttle = 30
 
     def __init__(self, **kwargs: Any):
-        """
-        Initializes the YouTubeBot instance.
-
-        Passes any keyword arguments to the base class initializer and configures key components:
-          - A search generator to locate Commons files that lack a YouTube video ID.
-          - A YouTube API client built with the API key from the environment.
-          - A language detector constructed from all available languages.
-        """
         super().__init__(**kwargs)
 
         self.generator = SearchPageGenerator(
@@ -57,21 +49,9 @@ class YouTubeBot(BaseBot):
         )
         self.video: YouTubeVideo | None = None
 
-        self.items = {
-            "youtube": ItemPage(self.wikidata, WikidataEntity.YouTube),
-        }
+        self.youtube_item = ItemPage(self.wikidata, WikidataEntity.YouTube)
 
     def treat_page(self) -> None:
-        """
-        Processes the page to extract YouTube metadata and update Wikidata claims.
-
-        Parses the current page's wikitext to retrieve the YouTube video ID from a
-        "YouTube CC-BY" template, then uses the YouTube API to fetch video details such as
-        the title, publication date, and channel information. If valid video data is found,
-        it creates or updates claims for the video ID, publication date, creator details,
-        source URL, and copyright license. If the video is not found, the method exits
-        without making changes. Finally, it saves the updates with a descriptive edit summary.
-        """
         # Reset
         self.video = None
 
@@ -89,21 +69,12 @@ class YouTubeBot(BaseBot):
             self.save()
             return
 
-        assert self.video
-
-        # self.create_published_in_claim(WikidataEntity.YouTube, self.video.published_at)
         self.create_creator_claim(self.video.channel.title)
         self.create_source_claim(f"https://www.youtube.com/watch?v={youtube_id}")
 
         self.save()
 
     def _fetch_youtube_data(self, youtube_id: str) -> None:
-        """
-        Fetches video details from the YouTube API
-
-        :param str youtube_id: The ID of the YouTube video to fetch
-        :return: None
-        """
         try:
             start = perf_counter()
             video = self.youtube.videos().list(part="snippet", id=youtube_id).execute()
@@ -153,7 +124,8 @@ class YouTubeBot(BaseBot):
         )
 
     def hook_creator_claim(self, claim: Claim) -> None:
-        assert self.video
+        if not self.video:
+            return
 
         if self.video.channel and self.video.channel.handle:
             youtube_handle_qualifier = Claim(
@@ -169,25 +141,17 @@ class YouTubeBot(BaseBot):
         claim.addQualifier(youtube_channel_id_qualifier)
 
     def hook_source_claim(self, claim: Claim) -> None:
-        assert self.video
+        if not self.video:
+            return
 
         content_deliverer_qualifier = Claim(
             self.commons, WikidataProperty.ContentDeliverer
         )
-        content_deliverer_qualifier.setTarget(self.items["youtube"])
+        content_deliverer_qualifier.setTarget(self.youtube_item)
         claim.addQualifier(content_deliverer_qualifier)
 
 
-def main():
-    """
-    Entrypoint for running the YouTube bot.
-
-    Instantiates the YouTubeBot and initiates its execution, starting the process of
-    retrieving video metadata and updating corresponding Wikidata claims.
-
-    If the --dry-run flag is provided, the bot will run in dry-run mode, which means it will
-    not save any changes to Wikimedia Commons and will exit after processing the first page.
-    """
+def main() -> None:
     YouTubeBot().run()
 
 
