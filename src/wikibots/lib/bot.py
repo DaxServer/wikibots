@@ -9,7 +9,6 @@ from time import perf_counter
 from typing import Any
 
 import mwparserfromhell
-import pywikibot.config
 import requests
 from deepdiff import DeepDiff
 from mwparserfromhell.wikicode import Wikicode
@@ -28,6 +27,7 @@ from pywikibot.bot import ExistingPageBot
 from pywikibot.data.api import Request
 from pywikibot.page import BasePage
 from pywikibot.page._collections import ClaimCollection
+from pywikibot.scripts.wrapper import pwb
 from redis import Redis
 
 from wikibots.lib.wikidata import WikidataEntity, WikidataProperty
@@ -71,11 +71,11 @@ class BaseBot(ExistingPageBot):
                 _access_token,
                 _access_secret,
             )
-            pywikibot.config.authenticate["commons.wikimedia.org"] = authenticate
+            pwb.config.authenticate["commons.wikimedia.org"] = authenticate
         else:
-            pywikibot.config.password_file = "user-password.py"
+            pwb.config.password_file = "user-password.py"
 
-        pywikibot.config.put_throttle = self.throttle
+        pwb.config.put_throttle = self.throttle
 
         self.wikidata = Site("wikidata", "wikidata")
         self.commons = Site("commons", "commons", user=os.getenv("PWB_USERNAME"))
