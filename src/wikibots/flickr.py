@@ -8,11 +8,11 @@ from flickr_api.exceptions import ResourceNotFound
 from flickr_api.models import SinglePhotoInfo
 from flickr_api.models.photo import Location
 from flickr_url_parser import parse_flickr_url
-from pywikibot import Claim, info, warning, error, Coordinate, WbTime
+from pywikibot import Claim, Coordinate, WbTime, error, info, warning
 from pywikibot.pagegenerators import SearchPageGenerator
 
 from wikibots.lib.bot import BaseBot
-from wikibots.lib.wikidata import WikidataProperty, WikidataEntity
+from wikibots.lib.wikidata import WikidataEntity, WikidataProperty
 
 
 class FlickrBot(BaseBot):
@@ -153,7 +153,7 @@ class FlickrBot(BaseBot):
 
         if granularity not in precision_map:
             error(
-                f'Unrecognised date granularity: {granularity} in photo {self.photo["date_taken"]}'
+                f"Unrecognised date granularity: {granularity} in photo {self.photo['date_taken']}"
             )
             return
 
@@ -289,7 +289,7 @@ class FlickrBot(BaseBot):
             END
             """
 
-            error(f'Unrecognised location accuracy: {location["accuracy"]}')
+            error(f"Unrecognised location accuracy: {location['accuracy']}")
             return None
 
         claim = Claim(self.commons, WikidataProperty.CoordinatesOfThePointOfView)

@@ -1,0 +1,16 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(wc *)",
+      "Bash(poetry show *)",
+      "WebFetch(domain:pypi.org)",
+      "WebFetch(domain:doc.wikimedia.org)",
+      "mcp__plugin_context7_context7__resolve-library-id",
+      "mcp__plugin_context7_context7__query-docs",
+      "Bash(poetry run ty check *)",
+      "Bash(poetry run ruff check *)",
+      "Bash(but status *)"
+    ]
+  },
+  "spinnerTipsEnabled": false
+}

@@ -1,14 +1,14 @@
 import re
 import string
 from dataclasses import dataclass
-from typing import Any
+from typing import Any, cast
 
-from pywikibot import warning, info, Claim, ItemPage
+from pywikibot import Claim, ItemPage, info, warning
 from pywikibot.page import BasePage
 from pywikibot.pagegenerators import SearchPageGenerator, WikidataSPARQLPageGenerator
 
 from wikibots.lib.bot import BaseBot
-from wikibots.lib.wikidata import WikidataProperty, WikidataEntity
+from wikibots.lib.wikidata import WikidataEntity, WikidataProperty
 
 sparql_taxa_query = string.Template(
     f"""
@@ -190,7 +190,7 @@ class INaturalistBot(BaseBot):
 
         if observation["quality_grade"] != "research":
             warning(
-                f'Skipping as observation quality grade is {observation["quality_grade"]}'
+                f"Skipping as observation quality grade is {observation['quality_grade']}"
             )
             return
 
@@ -230,13 +230,14 @@ class INaturalistBot(BaseBot):
                 )
                 return
 
+            item = cast(ItemPage, items[0])
             info(
-                f"Found Wikidata item for taxa https://www.inaturalist.org/taxa/{taxa_id} - {items[0].getID()}"
+                f"Found Wikidata item for taxa https://www.inaturalist.org/taxa/{taxa_id} - {item.getID()}"
             )
 
             # Store the mapping in the cache
-            self.__class__.taxa_wikidata_map[taxa_id] = items[0]
-            self.photo.depicts = items[0]
+            self.__class__.taxa_wikidata_map[taxa_id] = item
+            self.photo.depicts = item
             break
 
     def hook_creator_claim(self, claim: Claim) -> None:
@@ -290,9 +291,10 @@ class INaturalistBot(BaseBot):
             )
             return None
 
-        info(f"Wikidata item for iNaturalist user found - {items[0].getID()}")
+        item = cast(ItemPage, items[0])
+        info(f"Wikidata item for iNaturalist user found - {item.getID()}")
 
-        return items[0]
+        return item
 
 
 def main() -> None:
