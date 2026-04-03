@@ -88,6 +88,12 @@ class FlickrBot(BaseBot):
     def extract_flickr_data(self) -> str | None:
         assert self.wiki_properties
 
+        review_status = self.retrieve_template_data(["FlickreviewR"], ["status"])
+        if review_status != "pass":
+            warning(f"Skipping: FlickreviewR status is {review_status!r}, not 'pass'")
+            self.redis.set(self.wiki_properties.redis_key, 1)
+            return None
+
         flickr_url = self.retrieve_template_data(["FlickreviewR"], ["sourceurl"])
         if flickr_url is None:
             return None
