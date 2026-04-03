@@ -10,28 +10,28 @@ from time import perf_counter
 from typing import Any
 
 import mwparserfromhell
+import pywikibot.config
 import requests
 from deepdiff import DeepDiff
 from mwparserfromhell.wikicode import Wikicode
 from pywikibot import (
-    Site,
-    WbQuantity,
-    info,
-    critical,
     Claim,
     ItemPage,
-    warning,
-    WbTime,
+    Site,
     Timestamp,
+    WbQuantity,
+    WbTime,
+    critical,
+    info,
+    warning,
 )
 from pywikibot.bot import ExistingPageBot
 from pywikibot.data.api import Request
 from pywikibot.page import BasePage
 from pywikibot.page._collections import ClaimCollection
-from pywikibot.scripts.wrapper import pwb
 from redis import Redis
 
-from wikibots.lib.wikidata import WikidataProperty, WikidataEntity
+from wikibots.lib.wikidata import WikidataEntity, WikidataProperty
 
 
 @dataclass
@@ -60,30 +60,32 @@ class BaseBot(ExistingPageBot):
 
         super().__init__(**kwargs)
 
-        if (
-            os.getenv("PWB_CONSUMER_TOKEN")
-            and os.getenv("PWB_CONSUMER_SECRET")
-            and os.getenv("PWB_ACCESS_TOKEN")
-            and os.getenv("PWB_ACCESS_SECRET")
-        ):
-            authenticate = (
-                os.getenv("PWB_CONSUMER_TOKEN"),
-                os.getenv("PWB_CONSUMER_SECRET"),
-                os.getenv("PWB_ACCESS_TOKEN"),
-                os.getenv("PWB_ACCESS_SECRET"),
-            )
-            pwb.config.authenticate["commons.wikimedia.org"] = authenticate
-        else:
-            pwb.config.password_file = "user-password.py"
+        _consumer_token = os.getenv("PWB_CONSUMER_TOKEN")
+        _consumer_secret = os.getenv("PWB_CONSUMER_SECRET")
+        _access_token = os.getenv("PWB_ACCESS_TOKEN")
+        _access_secret = os.getenv("PWB_ACCESS_SECRET")
 
-        pwb.config.put_throttle = self.throttle
+        if _consumer_token and _consumer_secret and _access_token and _access_secret:
+            authenticate = (
+                _consumer_token,
+                _consumer_secret,
+                _access_token,
+                _access_secret,
+            )
+            pywikibot.config.authenticate["commons.wikimedia.org"] = authenticate
+        else:
+            pywikibot.config.password_file = "user-password.py"
+
+        pywikibot.config.put_throttle = self.throttle
 
         self.wikidata = Site("wikidata", "wikidata")
         self.commons = Site("commons", "commons", user=os.getenv("PWB_USERNAME"))
         self.commons.login()
 
-        if os.getenv("TOOL_REDIS_URI"):
-            self.redis = Redis.from_url(os.getenv("TOOL_REDIS_URI", ""), db=9)
+        _redis_uri = os.getenv("TOOL_REDIS_URI")
+
+        if _redis_uri:
+            self.redis = Redis.from_url(_redis_uri, db=9)
         else:
             try:
                 self.redis = Redis(db=9)
@@ -516,6 +518,7 @@ class BaseBot(ExistingPageBot):
 
     def get_file_metadata(self):
         assert self.current_page
+        assert self.wiki_properties
 
         payload = {
             "action": "query",

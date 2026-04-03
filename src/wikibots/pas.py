@@ -1,15 +1,14 @@
 import hashlib
 import re
-from datetime import datetime
 from time import perf_counter
 from typing import Any
 
 from mwparserfromhell.nodes import ExternalLink
-from pywikibot import warning, info
+from pywikibot import info, warning
 from pywikibot.pagegenerators import SearchPageGenerator
 
 from wikibots.lib.bot import BaseBot
-from wikibots.lib.wikidata import WikidataProperty, WikidataEntity
+from wikibots.lib.wikidata import WikidataProperty
 
 
 class PortableAntiquitiesSchemeBot(BaseBot):
@@ -67,7 +66,7 @@ class PortableAntiquitiesSchemeBot(BaseBot):
             return
 
         if image_json["id"] != image_id:
-            warning(f'Invalid image ID found: {image_id} != {image_json["id"]}')
+            warning(f"Invalid image ID found: {image_id} != {image_json['id']}")
             self.redis.set(self.wiki_properties.redis_key, 1)
             return
 
@@ -104,15 +103,15 @@ class PortableAntiquitiesSchemeBot(BaseBot):
         )
 
         # Add Published in claim with date qualifier if available
-        date_obj = None
+        # date_obj = None
 
-        if "created" in image_json and image_json["created"]:
-            try:
-                date_obj = datetime.strptime(image_json["created"], "%Y-%m-%d %H:%M:%S")
-            except Exception as e:
-                warning(f"Failed to parse created date: {e}")
-        else:
-            warning("No created field found in API response")
+        # if "created" in image_json and image_json["created"]:
+        #     try:
+        #         date_obj = datetime.strptime(image_json["created"], "%Y-%m-%d %H:%M:%S")
+        #     except Exception as e:
+        #         warning(f"Failed to parse created date: {e}")
+        # else:
+        #     warning("No created field found in API response")
 
         # self.create_published_in_claim(
         #     WikidataEntity.PortableAntiquitiesSchemeDatabase, date_obj

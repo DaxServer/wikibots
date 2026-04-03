@@ -1,4 +1,4 @@
-name: Black Formatter Check
+name: Lint
 
 on:
   pull_request:
@@ -7,7 +7,7 @@ permissions:
   contents: read
 
 jobs:
-  format-check:
+  lint:
     runs-on: ubuntu-latest
 
     steps:
@@ -25,5 +25,8 @@ jobs:
       - name: Install dependencies
         run: poetry install --no-root --with dev
 
-      - name: Run Black
-        run: poetry run black --check .
+      - name: Run ruff
+        run: poetry run ruff check .
+
+      - name: Run isort
+        run: poetry run isort --check .
