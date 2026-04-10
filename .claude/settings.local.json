@@ -2,17 +2,23 @@
   "permissions": {
     "allow": [
       "Bash(wc *)",
-      "Bash(poetry show *)",
-      "WebFetch(domain:pypi.org)",
+      "WebFetch(domain:commons.wikimedia.org)",
       "WebFetch(domain:doc.wikimedia.org)",
+      "WebFetch(domain:pypi.org)",
+      "Skill(code-review:code-review)",
       "mcp__plugin_context7_context7__resolve-library-id",
       "mcp__plugin_context7_context7__query-docs",
-      "Bash(poetry run ty check *)",
       "Bash(poetry run ruff check *)",
-      "Bash(but status *)",
+      "Bash(poetry run ty check *)",
+      "Bash(poetry show *)",
+      "Bash(gh pr view *)",
+      "Bash(but branch --help)",
+      "Bash(but commit *)",
       "Bash(but pr new *)",
-      "WebFetch(domain:commons.wikimedia.org)",
-      "Bash(but commit *)"
+      "Bash(but status *)",
+      "Bash(but --help)",
+      "Bash(poetry run pytest *)",
+      "Bash(poetry run isort *)"
     ]
   },
   "spinnerTipsEnabled": false

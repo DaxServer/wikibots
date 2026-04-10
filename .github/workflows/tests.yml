@@ -1,4 +1,4 @@
-name: Lint
+name: Tests
 
 on:
   pull_request:
@@ -7,7 +7,7 @@ permissions:
   contents: read
 
 jobs:
-  lint:
+  tests:
     runs-on: ubuntu-latest
 
     steps:
@@ -23,13 +23,7 @@ jobs:
           cache: 'poetry'
 
       - name: Install dependencies
-        run: poetry install --no-root --with dev
+        run: poetry install --with dev
 
-      - name: Run ruff
-        run: poetry run ruff check .
-
-      - name: Run isort
-        run: poetry run isort --check .
-
-      - name: Run type checker
-        run: poetry run ty check src/
+      - name: Run tests
+        run: poetry run pytest
