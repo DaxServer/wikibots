@@ -20,10 +20,11 @@ poetry run ruff format
 poetry run isort .
 
 # Type check
-poetry run ty check
-```
+poetry run ty check src/
 
-Tests are not yet set up in this project.
+# Run tests
+poetry run pytest
+```
 
 ## Architecture
 

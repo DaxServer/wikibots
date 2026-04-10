@@ -4,17 +4,20 @@ import time
 from datetime import datetime
 from time import perf_counter
 
+import httpx
 from flickr_api import FlickrApi
 from flickr_api.exceptions import PermissionDenied, ResourceNotFound
 from flickr_api.models import SinglePhotoInfo
 from flickr_api.models.photo import Location
 from flickr_url_parser import parse_flickr_url
 
-from wikibots.lib.bot import BaseBot
+from wikibots.lib.bot import BaseBot, RateLimitExhausted
 from wikibots.lib.claim import WBTIME_PRECISION, Claim
 from wikibots.lib.wikidata import WikidataEntity, WikidataProperty
 
 logger = logging.getLogger(__name__)
+
+RATE_LIMIT_DELAYS = (60, 180, 300)
 
 
 class FlickrBot(BaseBot):
@@ -137,18 +140,32 @@ class FlickrBot(BaseBot):
             logger.warning("Flickr photo skipped due to Redis cache")
             return
 
-        try:
-            start = perf_counter()
-            self.photo = self.flickr_api.get_single_photo_info(photo_id=flickr_photo_id)
-            logger.info(
-                f"Retrieved Flickr photo in {(perf_counter() - start) * 1000:.0f} ms"
-            )
-        except (ResourceNotFound, PermissionDenied) as e:
-            logger.warning(f"[{flickr_photo_id}] {e}")
-            self.redis.set(redis_key_photo, 1)
-        except Exception as e:
-            logger.error(f"[{flickr_photo_id}] {e}")
-            time.sleep(60)
+        delays = iter(RATE_LIMIT_DELAYS)
+        while True:
+            try:
+                start = perf_counter()
+                self.photo = self.flickr_api.get_single_photo_info(photo_id=flickr_photo_id)
+                logger.info(
+                    f"Retrieved Flickr photo in {(perf_counter() - start) * 1000:.0f} ms"
+                )
+                return
+            except (ResourceNotFound, PermissionDenied) as e:
+                logger.warning(f"[{flickr_photo_id}] {e}")
+                self.redis.set(redis_key_photo, 1)
+                return
+            except httpx.HTTPStatusError as e:
+                if e.response.status_code != 429:
+                    logger.error(f"[{flickr_photo_id}] {e}")
+                    return
+                delay = next(delays, None)
+                if delay is None:
+                    logger.critical(f"[{flickr_photo_id}] Rate limit exhausted after all retries")
+                    raise RateLimitExhausted
+                logger.warning(f"[{flickr_photo_id}] Rate limited, retrying in {delay}s")
+                time.sleep(delay)
+            except Exception as e:
+                logger.error(f"[{flickr_photo_id}] {e}")
+                return
 
     def hook_creator_claim(self, claim: Claim) -> None:
         if not self.photo:

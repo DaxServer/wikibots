@@ -22,7 +22,11 @@ COMMONS_API = "https://commons.wikimedia.org/w/api.php"
 WIKIDATA_SPARQL = "https://query.wikidata.org/sparql"
 
 
-class _DryRunStop(Exception):
+class DryRunStop(Exception):
+    pass
+
+
+class RateLimitExhausted(Exception):
     pass
 
 
@@ -139,7 +143,7 @@ class BaseBot(ClaimsMixin):
 
                 self.treat_page()
                 time.sleep(self.throttle)
-        except _DryRunStop:
+        except (DryRunStop, RateLimitExhausted):
             pass
 
     def skip_page(self, page: dict[str, Any]) -> bool:
@@ -269,7 +273,7 @@ class BaseBot(ClaimsMixin):
 
             if self.dry_run:
                 logger.info("Dry run mode: skipping save operation")
-                raise _DryRunStop()
+                raise DryRunStop()
 
             if self.always_null_edit:
                 logger.info("Performing null edit to flush any tracker categories")
@@ -283,7 +287,7 @@ class BaseBot(ClaimsMixin):
 
         if self.dry_run:
             logger.info("Dry run mode: skipping save operation")
-            raise _DryRunStop()
+            raise DryRunStop()
 
         try:
             start = perf_counter()
