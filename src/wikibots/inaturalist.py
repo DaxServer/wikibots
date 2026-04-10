@@ -1,14 +1,13 @@
+import logging
 import re
 import string
 from dataclasses import dataclass
-from typing import Any, cast
-
-from pywikibot import Claim, ItemPage, info, warning
-from pywikibot.page import BasePage
-from pywikibot.pagegenerators import SearchPageGenerator, WikidataSPARQLPageGenerator
 
 from wikibots.lib.bot import BaseBot
+from wikibots.lib.claim import Claim
 from wikibots.lib.wikidata import WikidataEntity, WikidataProperty
+
+logger = logging.getLogger(__name__)
 
 sparql_taxa_query = string.Template(
     f"""
@@ -43,7 +42,7 @@ class PhotoData:
     id: str
     observation_id: str
     creator: User | None = None
-    depicts: ItemPage | None = None
+    depicts: str | None = None
 
 
 def _extract_orcid_id(orcid_url: str | None) -> str | None:
@@ -59,34 +58,22 @@ def _extract_orcid_id(orcid_url: str | None) -> str | None:
 class INaturalistBot(BaseBot):
     redis_prefix = "ZHXgxFHT4ZBJjR+fLxCH9quuLYl7ky4N6fNV/oC4fbs="
     summary = "add [[Commons:Structured data|SDC]] based on metadata from iNaturalist"
+    search_query = (
+        f"file: hastemplate:iNaturalist hastemplate:iNaturalistReview"
+        f" -haswbstatement:{WikidataProperty.INaturalistPhotoId}"
+    )
 
-    def __init__(self, **kwargs: Any):
-        super().__init__(**kwargs)
+    def __init__(self) -> None:
+        super().__init__()
 
         # Cache for taxa-Wikidata item mappings
-        self.taxa_wikidata_map: dict[int, ItemPage] = {}
-
-        self.generator = SearchPageGenerator(
-            f"file: hastemplate:iNaturalist hastemplate:iNaturalistReview -haswbstatement:{WikidataProperty.INaturalistPhotoId}",
-            site=self.commons,
-        )
-
-        self.inaturalist_wd = ItemPage(self.wikidata, WikidataEntity.iNaturalist)
+        self.taxa_wikidata_map: dict[int, str] = {}
         self.photo: PhotoData | None = None
-
-    def skip_page(self, page: BasePage) -> bool:
-        redis_key = f"{self.redis_prefix}:commons:M{page.pageid}"
-
-        return (
-            bool(self.redis.exists(redis_key))
-            or self.commons.username() in page.contributors()
-        )
 
     def treat_page(self) -> None:
         # Reset
         self.photo = None
 
-        super().treat_page()
         assert self.wiki_properties
 
         status = self.retrieve_template_data(
@@ -96,7 +83,7 @@ class INaturalistBot(BaseBot):
             return
 
         if status not in ["pass", "pass-change"]:
-            warning(f"Skipping as iNaturalistReview status is {status}")
+            logger.warning(f"Skipping as iNaturalistReview status is {status}")
             self.redis.set(self.wiki_properties.redis_key, 1)
             return
 
@@ -138,31 +125,31 @@ class INaturalistBot(BaseBot):
 
         matches = re.match(r"https://www.inaturalist.org/photos/(\d+)", photo_url)
         if matches is None:
-            warning(f"Skipping as INaturalist URL is invalid {photo_url}")
+            logger.warning(f"Skipping as INaturalist URL is invalid {photo_url}")
             self.redis.set(self.wiki_properties.redis_key, 1)
             return
 
         self.photo = PhotoData(id=matches.group(1), observation_id=observation_id)
-        info(f"INaturalist Photo ID: {self.photo.id}")
-        info(f"INaturalist Observation ID: {observation_id}")
+        logger.info(f"INaturalist Photo ID: {self.photo.id}")
+        logger.info(f"INaturalist Observation ID: {observation_id}")
 
         try:
             observation = self.session.get(
                 f"https://api.inaturalist.org/v1/observations/{observation_id}",
-                headers={
-                    "Accept": "application/json",
-                },
+                headers={"Accept": "application/json"},
                 timeout=30,
             ).json()["results"][0]
         except Exception as e:
-            warning(f"Failed to fetch observation: {e}")
+            logger.warning(f"Failed to fetch observation: {e}")
             self.redis.set(self.wiki_properties.redis_key, 1)
             return
 
         if self.photo.id not in [
             o["photo_id"].__str__() for o in observation["observation_photos"]
         ]:
-            warning("Skipping as iNaturalist photo is not attached to observation")
+            logger.warning(
+                "Skipping as iNaturalist photo is not attached to observation"
+            )
             self.redis.set(self.wiki_properties.redis_key, 1)
             return
 
@@ -180,7 +167,7 @@ class INaturalistBot(BaseBot):
         assert self.photo
 
         if observation["quality_grade"] != "research":
-            warning(
+            logger.warning(
                 f"Skipping as observation quality grade is {observation['quality_grade']}"
             )
             return
@@ -189,44 +176,42 @@ class INaturalistBot(BaseBot):
             "prefers_community_taxon" in observation["preferences"]
             and observation["preferences"]["prefers_community_taxon"]
         ):
-            info("Using community taxon")
+            logger.info("Using community taxon")
             taxa = observation["community_taxon"]
         else:
             taxa = observation["taxon"]
 
         for taxa_id in reversed(taxa["ancestor_ids"]):
-            # Check if taxa_id is already in the cache
             if taxa_id in self.taxa_wikidata_map:
-                info(
-                    f"Using cached Wikidata item for taxa https://www.inaturalist.org/taxa/{taxa_id} - {self.taxa_wikidata_map[taxa_id].getID()}"
+                logger.info(
+                    f"Using cached Wikidata item for taxa https://www.inaturalist.org/taxa/{taxa_id}"
+                    f" - {self.taxa_wikidata_map[taxa_id]}"
                 )
                 self.photo.depicts = self.taxa_wikidata_map[taxa_id]
                 break
 
-            info(f"Searching Wikidata for taxon with ID {taxa_id}")
-            gen = WikidataSPARQLPageGenerator(
-                sparql_taxa_query.substitute(taxa=taxa_id), site=self.wikidata
-            )
-            items = list(gen)
+            logger.info(f"Searching Wikidata for taxon with ID {taxa_id}")
+            items = self._sparql_query(sparql_taxa_query.substitute(taxa=taxa_id))
 
             if len(items) == 0:
-                warning(
+                logger.warning(
                     f"No Wikidata items found for taxa https://www.inaturalist.org/taxa/{taxa_id}"
                 )
                 continue
 
             if len(items) > 1:
-                warning(
-                    f"Found multiple Wikidata items for taxa https://www.inaturalist.org/taxa/{taxa_id}: {items}"
+                logger.warning(
+                    f"Found multiple Wikidata items for taxa"
+                    f" https://www.inaturalist.org/taxa/{taxa_id}: {items}"
                 )
                 return
 
-            item = cast(ItemPage, items[0])
-            info(
-                f"Found Wikidata item for taxa https://www.inaturalist.org/taxa/{taxa_id} - {item.getID()}"
+            item = items[0]
+            logger.info(
+                f"Found Wikidata item for taxa https://www.inaturalist.org/taxa/{taxa_id}"
+                f" - {item}"
             )
 
-            # Store the mapping in the cache
             self.taxa_wikidata_map[taxa_id] = item
             self.photo.depicts = item
             break
@@ -234,65 +219,56 @@ class INaturalistBot(BaseBot):
     def hook_creator_claim(self, claim: Claim) -> None:
         if not self.photo or not self.photo.creator:
             return
-
-        inaturalist_user_id_qualifier = Claim(
-            self.commons, WikidataProperty.INaturalistUserId
+        claim.add_qualifier_string(
+            WikidataProperty.INaturalistUserId, self.photo.creator.id
         )
-        inaturalist_user_id_qualifier.setTarget(self.photo.creator.id)
-        claim.addQualifier(inaturalist_user_id_qualifier)
-
         if self.photo.creator.orcid:
-            orcid_qualifier = Claim(self.commons, WikidataProperty.ORCID)
-            orcid_qualifier.setTarget(self.photo.creator.orcid)
-            claim.addQualifier(orcid_qualifier)
+            claim.add_qualifier_string(WikidataProperty.ORCID, self.photo.creator.orcid)
 
     def hook_creator_target(self, claim: Claim) -> None:
         if not self.photo or not self.photo.creator:
-            claim.setSnakType("somevalue")
             return
-
         creator_item = self.find_creator_wikidata_item()
-
         if creator_item:
-            claim.setTarget(creator_item)
-        else:
-            claim.setSnakType("somevalue")
+            claim.set_entity_target(creator_item)
 
     def hook_depicts_claim(self, claim: Claim) -> None:
         if not self.photo or not self.photo.depicts:
             return
+        claim.add_reference_entity(
+            WikidataProperty.StatedIn, WikidataEntity.iNaturalist
+        )
 
-        stated_in_ref = Claim(self.commons, WikidataProperty.StatedIn)
-        stated_in_ref.setTarget(self.inaturalist_wd)
-        claim.addSource(stated_in_ref)
-
-    def find_creator_wikidata_item(self) -> ItemPage | None:
+    def find_creator_wikidata_item(self) -> str | None:
         """Find Wikidata item for the creator based on iNaturalist user ID."""
         assert self.photo and self.photo.creator
 
-        info(f"Searching Wikidata for iNaturalist user with ID {self.photo.creator.id}")
-        gen = WikidataSPARQLPageGenerator(
-            sparql_user_query.substitute(user_id=self.photo.creator.id),
-            site=self.wikidata,
+        logger.info(
+            f"Searching Wikidata for iNaturalist user with ID {self.photo.creator.id}"
         )
-        items = list(gen)
+        items = self._sparql_query(
+            sparql_user_query.substitute(user_id=self.photo.creator.id)
+        )
 
         if len(items) == 0:
             return None
 
         if len(items) > 1:
-            warning(
-                f"Found multiple Wikidata items for iNaturalist user https://www.inaturalist.org/people/{self.photo.creator.id}: {items}"
+            logger.warning(
+                f"Found multiple Wikidata items for iNaturalist user"
+                f" https://www.inaturalist.org/people/{self.photo.creator.id}: {items}"
             )
             return None
 
-        item = cast(ItemPage, items[0])
-        info(f"Wikidata item for iNaturalist user found - {item.getID()}")
-
+        item = items[0]
+        logger.info(f"Wikidata item for iNaturalist user found - {item}")
         return item
 
 
 def main() -> None:
+    logging.basicConfig(
+        level=logging.INFO, format="%(asctime)s %(levelname)s %(message)s"
+    )
     INaturalistBot().run()
 
 

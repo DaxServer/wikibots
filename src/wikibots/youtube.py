@@ -1,17 +1,18 @@
+import logging
 import os
 from dataclasses import dataclass
 from datetime import datetime
 from time import perf_counter
-from typing import Any
 
 import googleapiclient.discovery
 from dateutil.parser import isoparse
 from googleapiclient.errors import HttpError
-from pywikibot import Claim, ItemPage, info, warning
-from pywikibot.pagegenerators import SearchPageGenerator
 
 from wikibots.lib.bot import BaseBot
+from wikibots.lib.claim import Claim
 from wikibots.lib.wikidata import WikidataEntity, WikidataProperty
+
+logger = logging.getLogger(__name__)
 
 
 @dataclass
@@ -35,27 +36,22 @@ class YouTubeBot(BaseBot):
 
     # Throttle to 30 seconds to be under YouTube API quota 10k/day
     throttle = 30
+    search_query = (
+        f'file: filemime:video hastemplate:"YouTube CC-BY"'
+        f" -haswbstatement:{WikidataProperty.YouTubeVideoId}"
+    )
 
-    def __init__(self, **kwargs: Any):
-        super().__init__(**kwargs)
-
-        self.generator = SearchPageGenerator(
-            f'file: filemime:video hastemplate:"YouTube CC-BY" -haswbstatement:{WikidataProperty.YouTubeVideoId}',
-            site=self.commons,
-        )
+    def __init__(self) -> None:
+        super().__init__()
 
         self.youtube = googleapiclient.discovery.build(
             "youtube", "v3", developerKey=os.getenv("YOUTUBE_API_KEY")
         )
         self.video: YouTubeVideo | None = None
 
-        self.youtube_item = ItemPage(self.wikidata, WikidataEntity.YouTube)
-
     def treat_page(self) -> None:
         # Reset
         self.video = None
-
-        super().treat_page()
 
         youtube_id = self.retrieve_template_data(["From YouTube"], ["1"])
         if not youtube_id:
@@ -78,26 +74,28 @@ class YouTubeBot(BaseBot):
         try:
             start = perf_counter()
             video = self.youtube.videos().list(part="snippet", id=youtube_id).execute()
-            info(f"Retrieved video data in {(perf_counter() - start) * 1000:.0f} ms")
+            logger.info(
+                f"Retrieved video data in {(perf_counter() - start) * 1000:.0f} ms"
+            )
         except HttpError as e:
-            warning(f"Error fetching video data: {str(e)}")
+            logger.warning(f"Error fetching video data: {str(e)}")
             return
 
         if video["pageInfo"]["totalResults"] == 0:
-            warning(f"No video found with ID {youtube_id}")
+            logger.warning(f"No video found with ID {youtube_id}")
             return
 
         video_title = video["items"][0]["snippet"]["localized"]["title"].strip()
-        info(f"Video title: {video_title}")
+        logger.info(f"Video title: {video_title}")
 
         published_at = isoparse(video["items"][0]["snippet"]["publishedAt"].strip())
-        info(published_at)
+        logger.info(published_at)
 
         channel_id = video["items"][0]["snippet"]["channelId"].strip()
-        info(f"Channel ID: {channel_id}")
+        logger.info(f"Channel ID: {channel_id}")
 
         channel_title = video["items"][0]["snippet"]["channelTitle"].strip()
-        info(f"Channel title: {channel_title}")
+        logger.info(f"Channel title: {channel_title}")
 
         channel_handle = None
         try:
@@ -105,7 +103,9 @@ class YouTubeBot(BaseBot):
             channel = (
                 self.youtube.channels().list(part="snippet", id=channel_id).execute()
             )
-            info(f"Retrieved channel data in {(perf_counter() - start) * 1000:.0f} ms")
+            logger.info(
+                f"Retrieved channel data in {(perf_counter() - start) * 1000:.0f} ms"
+            )
 
             if (
                 channel["pageInfo"]["totalResults"] == 1
@@ -114,9 +114,9 @@ class YouTubeBot(BaseBot):
                 channel_handle = (
                     channel["items"][0]["snippet"]["customUrl"].strip().lstrip("@")
                 )
-                info(f"Channel handle: {channel_handle}")
+                logger.info(f"Channel handle: {channel_handle}")
         except HttpError as e:
-            warning(f"Error fetching channel data: {str(e)}")
+            logger.warning(f"Error fetching channel data: {str(e)}")
 
         ytc = YouTubeChannel(id=channel_id, title=channel_title, handle=channel_handle)
         self.video = YouTubeVideo(
@@ -126,32 +126,26 @@ class YouTubeBot(BaseBot):
     def hook_creator_claim(self, claim: Claim) -> None:
         if not self.video:
             return
-
         if self.video.channel and self.video.channel.handle:
-            youtube_handle_qualifier = Claim(
-                self.commons, WikidataProperty.YouTubeHandle
+            claim.add_qualifier_string(
+                WikidataProperty.YouTubeHandle, self.video.channel.handle
             )
-            youtube_handle_qualifier.setTarget(self.video.channel.handle)
-            claim.addQualifier(youtube_handle_qualifier)
-
-        youtube_channel_id_qualifier = Claim(
-            self.commons, WikidataProperty.YouTubeChannelId
+        claim.add_qualifier_string(
+            WikidataProperty.YouTubeChannelId, self.video.channel.id
         )
-        youtube_channel_id_qualifier.setTarget(self.video.channel.id)
-        claim.addQualifier(youtube_channel_id_qualifier)
 
     def hook_source_claim(self, claim: Claim) -> None:
         if not self.video:
             return
-
-        content_deliverer_qualifier = Claim(
-            self.commons, WikidataProperty.ContentDeliverer
+        claim.add_qualifier_entity(
+            WikidataProperty.ContentDeliverer, WikidataEntity.YouTube
         )
-        content_deliverer_qualifier.setTarget(self.youtube_item)
-        claim.addQualifier(content_deliverer_qualifier)
 
 
 def main() -> None:
+    logging.basicConfig(
+        level=logging.INFO, format="%(asctime)s %(levelname)s %(message)s"
+    )
     YouTubeBot().run()
 
 

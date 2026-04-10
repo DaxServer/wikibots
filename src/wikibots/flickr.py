@@ -1,36 +1,37 @@
+import logging
 import os
 import time
+from datetime import datetime
 from time import perf_counter
-from typing import Any
 
 from flickr_api import FlickrApi
-from flickr_api.exceptions import ResourceNotFound
+from flickr_api.exceptions import PermissionDenied, ResourceNotFound
 from flickr_api.models import SinglePhotoInfo
 from flickr_api.models.photo import Location
 from flickr_url_parser import parse_flickr_url
-from pywikibot import Claim, Coordinate, WbTime, error, info, warning
-from pywikibot.pagegenerators import SearchPageGenerator
 
 from wikibots.lib.bot import BaseBot
+from wikibots.lib.claim import WBTIME_PRECISION, Claim
 from wikibots.lib.wikidata import WikidataEntity, WikidataProperty
+
+logger = logging.getLogger(__name__)
 
 
 class FlickrBot(BaseBot):
     redis_prefix = "xQ6cz5J84Viw/K6FIcOH1kxJjfiS8jO56AoSmhBgO/A="
     summary = "add [[Commons:Structured data|SDC]] based on metadata from Flickr"
     always_null_edit = True
+    search_query = (
+        'file: incategory:"Flickr images reviewed by FlickreviewR 2" hastemplate:"FlickreviewR" '
+        f"-haswbstatement:{WikidataProperty.FlickrPhotoId}"
+    )
 
-    def __init__(self, **kwargs: Any):
-        super().__init__(**kwargs)
-
-        self.generator = SearchPageGenerator(
-            'file: incategory:"Flickr images reviewed by FlickreviewR 2" hastemplate:"FlickreviewR" '
-            f"-haswbstatement:{WikidataProperty.FlickrPhotoId}",
-            site=self.commons,
-        )
+    def __init__(self) -> None:
+        super().__init__()
 
         self.flickr_api = FlickrApi.with_api_key(
-            api_key=os.getenv("FLICKR_API_KEY", ""), user_agent=self.user_agent
+            api_key=os.getenv("FLICKR_API_KEY", ""),
+            user_agent=self.user_agent,
         )
         self.photo: SinglePhotoInfo | None = None
 
@@ -38,7 +39,6 @@ class FlickrBot(BaseBot):
         # Reset
         self.photo = None
 
-        super().treat_page()
         self.fetch_claims()
 
         photo_id = self.extract_flickr_data()
@@ -77,6 +77,20 @@ class FlickrBot(BaseBot):
             author_name_string=author_name, url=self.photo["owner"]["profile_url"]
         )
         self.create_source_claim(self.photo["url"], WikidataEntity.Flickr)
+        date_posted_dt: datetime | None = None
+        date_posted = self.photo.get("date_posted")
+        if isinstance(date_posted, datetime):
+            date_posted_dt = date_posted
+        elif isinstance(date_posted, (int, float)):
+            date_posted_dt = datetime.fromtimestamp(date_posted)
+        elif isinstance(date_posted, str):
+            try:
+                date_posted_dt = datetime.fromisoformat(
+                    date_posted.replace("Z", "+00:00")
+                )
+            except ValueError:
+                date_posted_dt = None
+        self.create_published_in_claim(WikidataEntity.Flickr, date_posted_dt)
         self.create_location_claim(self.photo["location"])
         self._create_inception_claim()
 
@@ -87,7 +101,9 @@ class FlickrBot(BaseBot):
 
         review_status = self.retrieve_template_data(["FlickreviewR"], ["status"])
         if review_status not in ("pass", "passed"):
-            warning(f"Skipping: FlickreviewR status is {review_status!r}, not 'pass' or 'passed'")
+            logger.warning(
+                f"Skipping: FlickreviewR status is {review_status!r}, not 'pass' or 'passed'"
+            )
             self.redis.set(self.wiki_properties.redis_key, 1)
             return None
 
@@ -95,20 +111,20 @@ class FlickrBot(BaseBot):
         if flickr_url is None:
             return None
 
-        info(flickr_url)
+        logger.info(flickr_url)
 
         try:
             flickr_id = parse_flickr_url(flickr_url)
         except Exception as e:
-            error(f"Failed to parse Flickr URL: {e}")
+            logger.error(f"Failed to parse Flickr URL: {e}")
             self.redis.set(self.wiki_properties.redis_key, 1)
             return None
 
-        info(flickr_id)
+        logger.info(flickr_id)
 
         if flickr_id.get("type") != "single_photo" or flickr_id.get("photo_id") is None:
-            error("Skipping as it is not a single photo in Flickr")
-            info(flickr_id)
+            logger.error("Skipping as it is not a single photo in Flickr")
+            logger.info(flickr_id)
             self.redis.set(self.wiki_properties.redis_key, 1)
             return None
 
@@ -117,31 +133,31 @@ class FlickrBot(BaseBot):
     def get_flickr_photo(self, flickr_photo_id: str) -> None:
         redis_key_photo = f"{self.redis_prefix}:{flickr_photo_id}:photo"
 
-        # Check Redis cache if Flickr photo is not available
         if self.redis.get(redis_key_photo) is not None:
-            warning("Flickr photo skipped due to Redis cache")
+            logger.warning("Flickr photo skipped due to Redis cache")
             return
 
         try:
             start = perf_counter()
             self.photo = self.flickr_api.get_single_photo_info(photo_id=flickr_photo_id)
-            info(f"Retrieved Flickr photo in {(perf_counter() - start) * 1000:.0f} ms")
-        except ResourceNotFound as e:
-            warning(f"[{flickr_photo_id}] {e}")
+            logger.info(
+                f"Retrieved Flickr photo in {(perf_counter() - start) * 1000:.0f} ms"
+            )
+        except (ResourceNotFound, PermissionDenied) as e:
+            logger.warning(f"[{flickr_photo_id}] {e}")
             self.redis.set(redis_key_photo, 1)
         except Exception as e:
-            error(f"[{flickr_photo_id}] {e}")
+            logger.error(f"[{flickr_photo_id}] {e}")
             time.sleep(60)
 
     def hook_creator_claim(self, claim: Claim) -> None:
         if not self.photo:
             return
+        claim.add_qualifier_string(
+            WikidataProperty.FlickrUserId, self.photo["owner"]["id"]
+        )
 
-        flickr_user_id_qualifier = Claim(self.commons, WikidataProperty.FlickrUserId)
-        flickr_user_id_qualifier.setTarget(self.photo["owner"]["id"])
-        claim.addQualifier(flickr_user_id_qualifier)
-
-    def _create_inception_claim(self):
+    def _create_inception_claim(self) -> None:
         assert self.photo
 
         if self.photo["date_taken"] is None:
@@ -149,34 +165,21 @@ class FlickrBot(BaseBot):
 
         granularity = self.photo["date_taken"]["granularity"]
         precision_map = {
-            "second": WbTime.PRECISION["day"],
-            "month": WbTime.PRECISION["month"],
-            "year": WbTime.PRECISION["year"],
-            "circa": WbTime.PRECISION["year"],
+            "second": WBTIME_PRECISION["day"],
+            "month": WBTIME_PRECISION["month"],
+            "year": WBTIME_PRECISION["year"],
+            "circa": WBTIME_PRECISION["year"],
         }
 
         if granularity not in precision_map:
-            error(
+            logger.error(
                 f"Unrecognised date granularity: {granularity} in photo {self.photo['date_taken']}"
             )
             return
 
         precision = precision_map[granularity]
-
-        year = self.photo["date_taken"]["value"].year
-        month = (
-            0
-            if precision < WbTime.PRECISION["month"]
-            else self.photo["date_taken"]["value"].month
-        )
-        day = (
-            0
-            if precision < WbTime.PRECISION["day"]
-            else self.photo["date_taken"]["value"].day
-        )
-
         self.create_inception_claim(
-            WbTime(year, month, day, precision=precision), granularity
+            self.photo["date_taken"]["value"], precision, granularity
         )
 
     def create_location_claim(self, location: Location | None) -> None:
@@ -186,7 +189,7 @@ class FlickrBot(BaseBot):
             WikidataProperty.CoordinatesOfThePointOfView
             in self.wiki_properties.existing_claims
         ):
-            return None
+            return
 
         """
             Source: https://github.com/Flickr-Foundation/flickypedia/blob/b7c9b711c31ea0ca67714a879571c52c643d9e9f/src/flickypedia/structured_data/statements/location_statement.py
@@ -209,7 +212,7 @@ class FlickrBot(BaseBot):
             See https://flickrfoundation.slack.com/archives/C05AVC1JYL9/p1696947242703349
             """
         if location is None:
-            return None
+            return
 
         # Some Flickr photos have "null coordinates" -- location data which
         # is obviously nonsensical.
@@ -225,7 +228,7 @@ class FlickrBot(BaseBot):
         #
         # See https://github.com/Flickr-Foundation/flickypedia/issues/461
         if location["latitude"] == 0.0 and location["longitude"] == 0.0:
-            return None
+            return
 
         # The accuracy parameter in the Flickr API response tells us
         # the precision of the location information (15 November 2023):
@@ -293,22 +296,22 @@ class FlickrBot(BaseBot):
             END
             """
 
-            error(f"Unrecognised location accuracy: {location['accuracy']}")
+            logger.error(f"Unrecognised location accuracy: {location['accuracy']}")
             return
 
-        claim = Claim(self.commons, WikidataProperty.CoordinatesOfThePointOfView)
-        claim.setTarget(
-            Coordinate(
-                location["latitude"],
-                location["longitude"],
-                precision=wikidata_precision,
-            )
+        claim = Claim.coordinate(
+            WikidataProperty.CoordinatesOfThePointOfView,
+            location["latitude"],
+            location["longitude"],
+            wikidata_precision,
         )
-
         self.wiki_properties.new_claims.append(claim)
 
 
 def main() -> None:
+    logging.basicConfig(
+        level=logging.INFO, format="%(asctime)s %(levelname)s %(message)s"
+    )
     FlickrBot().run()
 
 

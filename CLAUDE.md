@@ -31,9 +31,11 @@ wikibots enriches Wikimedia Commons files with structured data (SDC) pulled from
 
 ### Core structure
 
-- `src/wikibots/lib/bot.py` — `BaseBot` extends pywikibot's `ExistingPageBot`. All bots inherit from this. It handles OAuth2 auth, Redis caching, HTTP sessions, claim creation/validation, file metadata extraction, and rate limiting.
+- `src/wikibots/lib/claim.py` — `Claim` class (typed builder for Wikidata claims), `WbTime`, `WikiProperties`, `WBTIME_PRECISION`. All snak/dict logic is private here. Bots never construct `WbTime` directly — pass `datetime` + precision to claim methods.
+- `src/wikibots/lib/claims.py` — `ClaimsMixin` with all `create_*` claim methods and hook stubs (`hook_creator_claim`, `hook_creator_target`, `hook_depicts_claim`, `hook_source_claim`).
+- `src/wikibots/lib/bot.py` — `BaseBot(ClaimsMixin)`. Handles OAuth2 auth, Redis caching, HTTP sessions, file metadata, Commons/Wikidata API calls, and the main run loop.
 - `src/wikibots/lib/wikidata.py` — Named constants for all Wikidata property (P-numbers) and entity (Q-numbers) IDs used across bots.
-- `src/wikibots/flickr.py`, `inaturalist.py`, `pas.py`, `youtube.py` — Each bot searches Commons for files matching its source, extracts the external source ID from file descriptions, fetches metadata from the external API, and writes Wikidata claims back to Commons SDC.
+- `src/wikibots/flickr.py`, `inaturalist.py`, `pas.py`, `youtube.py` — Each bot overrides `treat_page()` and implements hooks for service-specific claim qualifiers.
 
 ### Data flow
 
@@ -71,4 +73,5 @@ The `status` parameter determines the review outcome. Only `pass` means the lice
 ### Constraints
 
 - `redis` must stay on `<6.0.0` — Toolforge runs Redis server 6.0.16, and redis-py 7.x requires Redis 7.2+.
+- `flickr_api` v3 (current) uses `PermissionDenied` for private/inaccessible photos — `PhotoIsPrivate` no longer exists.
 - pywikibot config is accessed via `pwb.config` where `pwb` is imported from `pywikibot.scripts.wrapper`. Importing through the wrapper triggers proper pywikibot initialization — using `pywikibot.config` directly does not work. The ty `possibly-missing-submodule` warnings on `pwb.config` are expected (exit 0).
