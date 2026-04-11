@@ -306,9 +306,16 @@ class BaseBot(ClaimsMixin):
                 timeout=60.0,
             )
             response.raise_for_status()
+            result = response.json()
+            if "error" in result:
+                logger.critical(
+                    f"API error saving {self.wiki_properties.mid}: {result['error']}"
+                )
+                return
             logger.info(
                 f"Updating {self.wiki_properties.mid} took {(perf_counter() - start):.1f} s"
             )
+            self.redis.set(self.wiki_properties.redis_key, 1)
             self.null_edit()
         except Exception as e:
             logger.critical(f"Failed to update: {e}")
