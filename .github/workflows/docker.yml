@@ -21,18 +21,6 @@ jobs:
     steps:
       - uses: actions/checkout@v6
 
-      - name: Install poetry
-        run: pipx install poetry
-
-      - name: Set up Python 3.13
-        uses: actions/setup-python@v6
-        with:
-          python-version: '3.13'
-          cache: 'poetry'
-
-      - name: Install dependencies
-        run: poetry install --no-root
-
       - uses: docker/login-action@v4
         with:
           registry: ghcr.io
