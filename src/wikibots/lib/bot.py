@@ -33,7 +33,7 @@ class RateLimitExhausted(Exception):
 class BaseBot(ClaimsMixin):
     summary = "add [[Commons:Structured data|SDC]] based on metadata"
     redis_prefix = ""
-    throttle = 5
+    throttle = 10
     search_query = ""
     always_null_edit = False
 
