@@ -5,4 +5,6 @@ RUN pip install poetry
 WORKDIR /app
 COPY . .
 
+RUN poetry install
+
 ENTRYPOINT [ "poetry", "run" ]
