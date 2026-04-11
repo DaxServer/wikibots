@@ -1,12 +1,8 @@
-.ai*
+.claude
 .git*
 .poetry
-.venv
+.pytest_cache
+.ruff*
+.vscode
 __pycache__
 apicache
-ignored
-
-pywikibot-*.lwp
-throttle.ctrl
-user-password.py
-*.sh
