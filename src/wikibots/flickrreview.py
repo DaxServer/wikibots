@@ -11,7 +11,7 @@ FLICKRREVIEW_TEMPLATE = "{{Flickrreview}}\n"
 class FlickreviewrBot(BaseBot):
     redis_prefix = "flickrreview"
     summary = (
-        "add [[Template:Flickrreview|Flickrreview]] template to Flickypedia uploads. test run."
+        "add [[Template:Flickrreview|Flickrreview]] template to Flickypedia uploads"
     )
     search_query = (
         'file: incategory:"Uploads using Flickypedia" -hastemplate:Flickrreview'
@@ -62,22 +62,17 @@ class FlickreviewrBot(BaseBot):
             logger.info(new_text)
             return
 
-        token = self._get_csrf_token()
-        response = self._commons_session.post(
-            "https://commons.wikimedia.org/w/api.php",
+        result = self._commons_api(
+            params={"action": "edit"},
+            method="POST",
             data={
-                "action": "edit",
                 "pageid": self.current_page["pageid"],
                 "text": new_text,
                 "summary": self.summary,
                 "bot": "1",
-                "format": "json",
-                "token": token,
+                "token": self._get_csrf_token(),
             },
-            timeout=60.0,
         )
-        response.raise_for_status()
-        result = response.json()
         if "error" in result:
             logger.critical(
                 f"API error editing {self.current_page['title']}: {result['error']}"
