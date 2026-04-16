@@ -42,7 +42,7 @@ class BaseBot(ClaimsMixin):
         self.current_page: dict[str, Any] = {}
         self.wiki_properties: WikiProperties | None = None
 
-        self._username = os.getenv("PWB_USERNAME", "")
+        self._username = os.getenv("PWB_USERNAME", "DaxServer")
         self.user_agent = f"{self._username} / Wikimedia Commons / {os.getenv('EMAIL')}"
 
         auth = OAuth1(
@@ -148,6 +148,39 @@ class BaseBot(ClaimsMixin):
 
     def skip_page(self, page: dict[str, Any]) -> bool:
         return False
+
+    def has_template(self, page: dict[str, Any], template_name: str) -> bool:
+        """Check if a page contains a specific template."""
+        result = self._commons_api(
+            {
+                "action": "query",
+                "pageids": page["pageid"],
+                "prop": "templates",
+                "tltemplates": f"Template:{template_name}",
+                "tllimit": 1,
+                "formatversion": 2,
+            }
+        )
+        pages = result.get("query", {}).get("pages", [])
+        templates = pages[0].get("templates", []) if pages else []
+        return len(templates) > 0
+
+    def has_user_edited(self, page: dict[str, Any]) -> bool:
+        """Check if the bot user has previously edited this page."""
+        result = self._commons_api(
+            {
+                "action": "query",
+                "pageids": page["pageid"],
+                "prop": "revisions",
+                "rvuser": self._username,
+                "rvlimit": 1,
+                "rvprop": "ids",
+                "formatversion": 2,
+            }
+        )
+        pages = result.get("query", {}).get("pages", [])
+        revisions = pages[0].get("revisions", []) if pages else []
+        return len(revisions) > 0
 
     def treat_page(self) -> None:
         pass
