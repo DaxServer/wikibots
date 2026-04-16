@@ -1,5 +1,6 @@
 from dataclasses import dataclass, field
 from datetime import datetime
+from decimal import Decimal
 from typing import ClassVar
 
 from mwparserfromhell.wikicode import Wikicode
@@ -70,7 +71,8 @@ def _string_dv(value: str) -> dict:
 
 def _quantity_dv(amount: int | float, unit_id: str | None = None) -> dict:
     unit = f"http://www.wikidata.org/entity/{unit_id}" if unit_id else "1"
-    return {"type": "quantity", "value": {"amount": f"+{amount}", "unit": unit}}
+    amount_str = format(Decimal(repr(amount)), "+f")
+    return {"type": "quantity", "value": {"amount": amount_str, "unit": unit}}
 
 
 def _time_dv(wbtime: WbTime) -> dict:

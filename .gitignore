@@ -1,5 +1,6 @@
 .poetry
 .pytest_cache
+.ruff_cache
 .venv
 __pycache__
 apicache
