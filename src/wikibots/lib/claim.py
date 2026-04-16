@@ -71,8 +71,8 @@ def _string_dv(value: str) -> dict:
 
 def _quantity_dv(amount: int | float, unit_id: str | None = None) -> dict:
     unit = f"http://www.wikidata.org/entity/{unit_id}" if unit_id else "1"
-    amount_str = format(Decimal(repr(amount)), "f")
-    return {"type": "quantity", "value": {"amount": f"+{amount_str}", "unit": unit}}
+    amount_str = format(Decimal(repr(amount)), "+f")
+    return {"type": "quantity", "value": {"amount": amount_str, "unit": unit}}
 
 
 def _time_dv(wbtime: WbTime) -> dict:
