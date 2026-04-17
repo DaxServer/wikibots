@@ -9,9 +9,11 @@ from wikibots.lib.bot import RateLimitExhausted
 
 def make_bot() -> FlickrBot:
     """Create a FlickrBot with all external dependencies mocked."""
-    with patch("wikibots.lib.bot.Redis") as mock_redis_cls, \
-         patch("wikibots.lib.bot.requests.Session"), \
-         patch("wikibots.flickr.FlickrApi"):
+    with (
+        patch("wikibots.lib.bot.Redis") as mock_redis_cls,
+        patch("wikibots.lib.bot.requests.Session"),
+        patch("wikibots.flickr.FlickrApi"),
+    ):
         mock_redis_cls.return_value.ping.return_value = True
         bot = FlickrBot()
     bot.redis = MagicMock()
@@ -21,7 +23,9 @@ def make_bot() -> FlickrBot:
 def make_429_error() -> httpx.HTTPStatusError:
     response = MagicMock(spec=httpx.Response)
     response.status_code = 429
-    return httpx.HTTPStatusError("429 Too Many Requests", request=MagicMock(), response=response)
+    return httpx.HTTPStatusError(
+        "429 Too Many Requests", request=MagicMock(), response=response
+    )
 
 
 def test_rate_limit_retries_with_delays_then_raises(mocker):

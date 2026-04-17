@@ -7,15 +7,15 @@ authors = [
 readme = "README.md"
 requires-python = ">=3.13,<4.0"
 dependencies = [
-    "python-dateutil (>=2.9.0.post0,<3.0.0)",
     "deepdiff (>=9.0.0,<10.0.0)",
-    "requests-oauthlib (>=2.0.0,<3.0.0)",
     "google-api-python-client (>=2.166.0,<3.0.0)",
     "flickr-photos-api (>=3.0.0,<4.0.0)",
     "flickr-url-parser (>=1.11.0,<2.0.0)",
-    "redis (>=5.2.1,<6.0.0)",
     "mwparserfromhell (>=0.7.2,<1.0.0)",
+    "python-dateutil (>=2.9.0.post0,<3.0.0)",
+    "redis (>=5.2.1,<6.0.0)",
     "requests (>=2.32.0,<3.0.0)",
+    "requests-oauthlib (>=2.0.0,<3.0.0)",
 ]
 
 [tool.poetry]
@@ -23,6 +23,7 @@ packages = [{include = "wikibots", from = "src"}]
 
 [project.scripts]
 flickr = "wikibots.flickr:main"
+flickrreview = "wikibots.flickrreview:main"
 inaturalist = "wikibots.inaturalist:main"
 pas = "wikibots.pas:main"
 youtube = "wikibots.youtube:main"
@@ -43,12 +44,12 @@ exclude = [
 
 [dependency-groups]
 dev = [
-    "ruff (>=0.15.9,<0.16.0)",
-    "ty (>=0.0.28,<0.0.29)",
     "isort (>=8.0.1,<9.0.0)",
     "pytest (>=9.0.3,<10.0.0)",
     "pytest-mock (>=3.15.1,<4.0.0)",
-    "pytest-timeout (>=2.4.0,<3.0.0)"
+    "pytest-timeout (>=2.4.0,<3.0.0)",
+    "ruff (>=0.15.10,<0.16.0)",
+    "ty (>=0.0.31,<0.0.32)",
 ]
 
 

@@ -144,7 +144,9 @@ class FlickrBot(BaseBot):
         while True:
             try:
                 start = perf_counter()
-                self.photo = self.flickr_api.get_single_photo_info(photo_id=flickr_photo_id)
+                self.photo = self.flickr_api.get_single_photo_info(
+                    photo_id=flickr_photo_id
+                )
                 logger.info(
                     f"Retrieved Flickr photo in {(perf_counter() - start) * 1000:.0f} ms"
                 )
@@ -159,9 +161,13 @@ class FlickrBot(BaseBot):
                     return
                 delay = next(delays, None)
                 if delay is None:
-                    logger.critical(f"[{flickr_photo_id}] Rate limit exhausted after all retries")
+                    logger.critical(
+                        f"[{flickr_photo_id}] Rate limit exhausted after all retries"
+                    )
                     raise RateLimitExhausted
-                logger.warning(f"[{flickr_photo_id}] Rate limited, retrying in {delay}s")
+                logger.warning(
+                    f"[{flickr_photo_id}] Rate limited, retrying in {delay}s"
+                )
                 time.sleep(delay)
             except Exception as e:
                 logger.error(f"[{flickr_photo_id}] {e}")

@@ -36,7 +36,8 @@ wikibots enriches Wikimedia Commons files with structured data (SDC) pulled from
 - `src/wikibots/lib/claims.py` — `ClaimsMixin` with all `create_*` claim methods and hook stubs (`hook_creator_claim`, `hook_creator_target`, `hook_depicts_claim`, `hook_source_claim`).
 - `src/wikibots/lib/bot.py` — `BaseBot(ClaimsMixin)`. Handles OAuth2 auth, Redis caching, HTTP sessions, file metadata, Commons/Wikidata API calls, and the main run loop.
 - `src/wikibots/lib/wikidata.py` — Named constants for all Wikidata property (P-numbers) and entity (Q-numbers) IDs used across bots.
-- `src/wikibots/flickr.py`, `inaturalist.py`, `pas.py`, `youtube.py` — Each bot overrides `treat_page()` and implements hooks for service-specific claim qualifiers.
+- `src/wikibots/flickr.py`, `inaturalist.py`, `pas.py`, `youtube.py` — SDC bots: override `treat_page()` and implement hooks for service-specific claim qualifiers. Use `save()` to write claims via `wbeditentity`.
+- `src/wikibots/flickrreview.py` — Wikitext bot: adds `{{Flickrreview}}` to Flickypedia uploads. Uses the `edit` API action directly (not `wbeditentity`). Override `skip_page()` for pre-loop filtering with Redis caching.
 
 ### Data flow
 
@@ -73,6 +74,7 @@ The `status` parameter determines the review outcome. Only `pass` means the lice
 
 ### Constraints
 
+- Commons API with `formatversion: 2` returns `pages` as a **list**, not a dict keyed by pageid. Use `pages[0]` — not `pages.get(pageid)`.
 - `redis` must stay on `<6.0.0` — Toolforge runs Redis server 6.0.16, and redis-py 7.x requires Redis 7.2+.
 - `flickr_api` v3 (current) uses `PermissionDenied` for private/inaccessible photos — `PhotoIsPrivate` no longer exists.
 - pywikibot config is accessed via `pwb.config` where `pwb` is imported from `pywikibot.scripts.wrapper`. Importing through the wrapper triggers proper pywikibot initialization — using `pywikibot.config` directly does not work. The ty `possibly-missing-submodule` warnings on `pwb.config` are expected (exit 0).
