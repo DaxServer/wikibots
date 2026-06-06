@@ -35,6 +35,7 @@ class BaseBot(ClaimsMixin):
     redis_prefix = ""
     throttle = 10
     search_query = ""
+    search_queries: list[str] = []
     always_null_edit = False
 
     def __init__(self) -> None:
@@ -90,23 +91,25 @@ class BaseBot(ClaimsMixin):
         return result["query"]["tokens"]["csrftoken"]
 
     def _search_pages(self) -> Iterator[dict[str, Any]]:
-        """Yield file pages matching the search query with pagination."""
-        params: dict[str, Any] = {
-            "action": "query",
-            "list": "search",
-            "srsearch": self.search_query,
-            "srnamespace": 6,
-            "srlimit": 50,
-            "srinfo": "",
-            "srprop": "",
-        }
-        while True:
-            result = self._commons_api(params)
-            for page in result.get("query", {}).get("search", []):
-                yield page
-            if "continue" not in result:
-                break
-            params.update(result["continue"])
+        """Yield file pages matching the search query/queries with pagination."""
+        queries = self.search_queries if self.search_queries else [self.search_query]
+        for query in queries:
+            params: dict[str, Any] = {
+                "action": "query",
+                "list": "search",
+                "srsearch": query,
+                "srnamespace": 6,
+                "srlimit": 50,
+                "srinfo": "",
+                "srprop": "",
+            }
+            while True:
+                result = self._commons_api(params)
+                for page in result.get("query", {}).get("search", []):
+                    yield page
+                if "continue" not in result:
+                    break
+                params.update(result["continue"])
 
     def _sparql_query(self, query: str) -> list[str]:
         """Execute a SPARQL query on Wikidata, return list of entity IDs."""

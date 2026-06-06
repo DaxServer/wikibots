@@ -24,10 +24,10 @@ class FlickrBot(BaseBot):
     redis_prefix = "xQ6cz5J84Viw/K6FIcOH1kxJjfiS8jO56AoSmhBgO/A="
     summary = "add [[Commons:Structured data|SDC]] based on metadata from Flickr"
     always_null_edit = True
-    search_query = (
-        'file: incategory:"Flickr images reviewed by FlickreviewR 2" hastemplate:"FlickreviewR" '
-        f"-haswbstatement:{WikidataProperty.FlickrPhotoId}"
-    )
+    search_queries = [
+        f'file: incategory:"Flickr images reviewed by FlickreviewR 2" hastemplate:"FlickreviewR" -haswbstatement:{WikidataProperty.FlickrPhotoId}',
+        f'file: incategory:"Uploads using Flickypedia" -haswbstatement:{WikidataProperty.FlickrPhotoId}',
+    ]
 
     def __init__(self) -> None:
         super().__init__()
@@ -102,6 +102,34 @@ class FlickrBot(BaseBot):
     def extract_flickr_data(self) -> str | None:
         assert self.wiki_properties
 
+        self.parse_wikicode()
+        assert self.wiki_properties.wikicode
+
+        templates = self.wiki_properties.wikicode.filter_templates()
+        template_names = [t.name.strip() for t in templates]
+
+        flickr_url = (
+            self._extract_flickr_id_from_flickypedia()
+            if "Uploaded with Flickypedia" in template_names
+            else self._extract_flickr_id_from_flickreviewer()
+        )
+
+        if flickr_url is None:
+            return None
+
+        logger.info(flickr_url)
+        return self._parse_flickr_photo_id(flickr_url)
+
+    def _extract_flickr_id_from_flickypedia(self) -> str | None:
+        assert self.wiki_properties
+
+        return self.retrieve_template_data(
+            ["Uploaded with Flickypedia"], ["flickrPhotoUrl"]
+        )
+
+    def _extract_flickr_id_from_flickreviewer(self) -> str | None:
+        assert self.wiki_properties
+
         review_status = self.retrieve_template_data(["FlickreviewR"], ["status"])
         if review_status not in ("pass", "passed"):
             logger.warning(
@@ -110,11 +138,10 @@ class FlickrBot(BaseBot):
             self.redis.set(self.wiki_properties.redis_key, 1)
             return None
 
-        flickr_url = self.retrieve_template_data(["FlickreviewR"], ["sourceurl"])
-        if flickr_url is None:
-            return None
+        return self.retrieve_template_data(["FlickreviewR"], ["sourceurl"])
 
-        logger.info(flickr_url)
+    def _parse_flickr_photo_id(self, flickr_url: str) -> str | None:
+        assert self.wiki_properties
 
         try:
             flickr_id = parse_flickr_url(flickr_url)
@@ -144,7 +171,9 @@ class FlickrBot(BaseBot):
         while True:
             try:
                 start = perf_counter()
-                self.photo = self.flickr_api.get_single_photo_info(photo_id=flickr_photo_id)
+                self.photo = self.flickr_api.get_single_photo_info(
+                    photo_id=flickr_photo_id
+                )
                 logger.info(
                     f"Retrieved Flickr photo in {(perf_counter() - start) * 1000:.0f} ms"
                 )
@@ -159,9 +188,13 @@ class FlickrBot(BaseBot):
                     return
                 delay = next(delays, None)
                 if delay is None:
-                    logger.critical(f"[{flickr_photo_id}] Rate limit exhausted after all retries")
+                    logger.critical(
+                        f"[{flickr_photo_id}] Rate limit exhausted after all retries"
+                    )
                     raise RateLimitExhausted
-                logger.warning(f"[{flickr_photo_id}] Rate limited, retrying in {delay}s")
+                logger.warning(
+                    f"[{flickr_photo_id}] Rate limited, retrying in {delay}s"
+                )
                 time.sleep(delay)
             except Exception as e:
                 logger.error(f"[{flickr_photo_id}] {e}")
