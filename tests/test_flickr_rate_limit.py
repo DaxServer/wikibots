@@ -4,7 +4,6 @@ from xml.etree import ElementTree as ET
 
 import httpx
 import pytest
-
 from flickr_api import FlickrApi
 
 from wikibots.flickr import FlickrBot, _PatchedFlickrApi
