@@ -20,6 +20,17 @@ logger = logging.getLogger(__name__)
 RATE_LIMIT_DELAYS = (60, 180, 300)
 
 
+class _PatchedFlickrApi(FlickrApi):
+    # Temporary fix until flickr-photos-api handles missing <usage> attributes
+    def parse_single_photo_info(self, info_resp, *, photo_id):
+        usage_elem = info_resp.find("photo/usage")
+        if usage_elem is not None:
+            for attr in ("candownload", "canblog", "canprint", "canshare"):
+                if attr not in usage_elem.attrib:
+                    usage_elem.set(attr, "0")
+        return super().parse_single_photo_info(info_resp, photo_id=photo_id)
+
+
 class FlickrBot(BaseBot):
     redis_prefix = "xQ6cz5J84Viw/K6FIcOH1kxJjfiS8jO56AoSmhBgO/A="
     summary = "add [[Commons:Structured data|SDC]] based on metadata from Flickr"
@@ -32,7 +43,7 @@ class FlickrBot(BaseBot):
     def __init__(self) -> None:
         super().__init__()
 
-        self.flickr_api = FlickrApi.with_api_key(
+        self.flickr_api = _PatchedFlickrApi.with_api_key(
             api_key=os.getenv("FLICKR_API_KEY", ""),
             user_agent=self.user_agent,
         )

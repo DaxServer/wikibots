@@ -13,7 +13,7 @@ def make_bot() -> FlickrBot:
     with (
         patch("wikibots.lib.bot.Redis") as mock_redis_cls,
         patch("wikibots.lib.bot.requests.Session"),
-        patch("wikibots.flickr.FlickrApi"),
+        patch("wikibots.flickr._PatchedFlickrApi"),
     ):
         mock_redis_cls.return_value.ping.return_value = True
         bot = FlickrBot()
