@@ -1,10 +1,12 @@
 from typing import cast
 from unittest.mock import MagicMock, call, patch
+from xml.etree import ElementTree as ET
 
 import httpx
 import pytest
+from flickr_api import FlickrApi
 
-from wikibots.flickr import FlickrBot
+from wikibots.flickr import FlickrBot, _PatchedFlickrApi
 from wikibots.lib.bot import RateLimitExhausted
 
 
@@ -13,7 +15,7 @@ def make_bot() -> FlickrBot:
     with (
         patch("wikibots.lib.bot.Redis") as mock_redis_cls,
         patch("wikibots.lib.bot.requests.Session"),
-        patch("wikibots.flickr.FlickrApi"),
+        patch("wikibots.flickr._PatchedFlickrApi"),
     ):
         mock_redis_cls.return_value.ping.return_value = True
         bot = FlickrBot()
@@ -27,6 +29,35 @@ def make_429_error() -> httpx.HTTPStatusError:
     return httpx.HTTPStatusError(
         "429 Too Many Requests", request=MagicMock(), response=response
     )
+
+
+def test_patched_flickr_api_fills_missing_usage_attrs():
+    info_resp = ET.fromstring(
+        '<rsp><photo><usage candownload="1" canblog="0" canshare="1"/></photo></rsp>'
+    )
+    with patch.object(FlickrApi, "parse_single_photo_info", return_value={}):
+        api = _PatchedFlickrApi.__new__(_PatchedFlickrApi)
+        api.parse_single_photo_info(info_resp, photo_id="55315578212")
+
+    usage = info_resp.find("photo/usage")
+    assert usage is not None
+    assert usage.attrib["canprint"] == "0"
+    assert usage.attrib["candownload"] == "1"
+    assert usage.attrib["canblog"] == "0"
+    assert usage.attrib["canshare"] == "1"
+
+
+def test_patched_flickr_api_does_not_overwrite_existing_usage_attrs():
+    info_resp = ET.fromstring(
+        '<rsp><photo><usage candownload="1" canblog="1" canprint="1" canshare="1"/></photo></rsp>'
+    )
+    with patch.object(FlickrApi, "parse_single_photo_info", return_value={}):
+        api = _PatchedFlickrApi.__new__(_PatchedFlickrApi)
+        api.parse_single_photo_info(info_resp, photo_id="12345")
+
+    usage = info_resp.find("photo/usage")
+    assert usage is not None
+    assert usage.attrib["canprint"] == "1"
 
 
 def test_rate_limit_retries_with_delays_then_raises(mocker):
